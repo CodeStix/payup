@@ -1,7 +1,7 @@
 "use client";
 
 import useSWR from "swr";
-import { Button, Text, Center, Heading, Skeleton, Flex, Card, CardBody, CardFooter, CardHeader } from "@chakra-ui/react";
+import { Button, Text, Center, Heading, Skeleton, Flex, Card, CardBody, CardFooter, CardHeader, Divider } from "@chakra-ui/react";
 import type { PaymentRequest } from "@prisma/client";
 import { faArrowRight } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -9,6 +9,7 @@ import { signIn, signOut, useSession } from "next-auth/react";
 import { fetcher } from "@/util";
 import { useRouter } from "next/navigation";
 import { LogOutButton } from "@/components/LogOutButton";
+import { AppHeader } from "@/components/AppHeader";
 
 export default function Home() {
     const router = useRouter();
@@ -31,9 +32,9 @@ export default function Home() {
     return (
         <Flex style={{ height: "100%", justifyContent: "center" }}>
             <Flex style={{ flexDirection: "column", gap: "2rem", padding: "1rem", width: "400px" }}>
-                <Heading textAlign="center" as="h1">
-                    Pay Up!
-                </Heading>
+                <AppHeader />
+
+                <Divider />
 
                 {/* <Button size="lg" colorScheme="orange" rightIcon={<FontAwesomeIcon icon={faArrowRight} />} onClick={() => signIn("google")}>
                 Create Payment Request

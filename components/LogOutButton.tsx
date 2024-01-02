@@ -1,28 +1,37 @@
-import { Button } from "@chakra-ui/react";
+import { Button, IconButton } from "@chakra-ui/react";
+import { faSignOut } from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export function LogOutButton() {
+export function LogOutButton(props: { small?: boolean }) {
     const [loading, setLoading] = useState(false);
     const router = useRouter();
 
-    return (
-        <Button
+    async function logOut() {
+        setLoading(true);
+        try {
+            await signOut();
+        } finally {
+            location.href = "/";
+            setLoading(false);
+        }
+    }
+
+    return props.small ? (
+        <IconButton
+            icon={<FontAwesomeIcon icon={faSignOut} />}
+            aria-label="sign out"
             mt={"auto"}
-            variant="outline"
+            variant="solid"
             isDisabled={loading}
             colorScheme="red"
-            onClick={async () => {
-                setLoading(true);
-                try {
-                    await signOut();
-                } finally {
-                    location.href = "/";
-                    setLoading(false);
-                }
-            }}>
-            Log out
+            onClick={logOut}
+        />
+    ) : (
+        <Button mt={"auto"} variant="outline" isDisabled={loading} colorScheme="red" onClick={logOut}>
+            Sign out
         </Button>
     );
 }

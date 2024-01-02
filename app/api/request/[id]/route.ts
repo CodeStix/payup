@@ -18,9 +18,23 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
                 email: session.user.email,
             },
         },
+        include: {
+            usersToPay: {
+                include: {
+                    user: {
+                        select: {
+                            email: true,
+                            id: true,
+                            userName: true,
+                            avatarUrl: true,
+                        },
+                    },
+                },
+            },
+        },
     });
 
-    return NextResponse.json({ request: r }, { status: !r ? 404 : 200 });
+    return NextResponse.json(r, { status: !r ? 404 : 200 });
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }): Promise<NextResponse> {
@@ -50,8 +64,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const body = (await request.json()) as {
         name: string;
         description: string;
-        usersToPay: {
-            email: string;
+        usersToPay?: {
+            id: number;
         }[];
     };
 
@@ -65,8 +79,50 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         data: {
             description: body.description,
             name: body.name,
+            usersToPay: body.usersToPay
+                ? {
+                      connectOrCreate: body.usersToPay.map((u) => ({
+                          where: {
+                              userId_paymentRequestId: {
+                                  paymentRequestId: params.id,
+                                  userId: u.id,
+                              },
+                          },
+                          create: {
+                              userId: u.id,
+                          },
+                      })),
+                  }
+                : {},
+        },
+        include: {
+            usersToPay: {
+                include: {
+                    user: {
+                        select: {
+                            email: true,
+                            id: true,
+                            userName: true,
+                            avatarUrl: true,
+                        },
+                    },
+                },
+            },
         },
     });
+
+    if (body.usersToPay) {
+        const toDelete = new Set(newRequest.usersToPay.map((e) => e.userId));
+        body.usersToPay.forEach((e) => toDelete.delete(e.id));
+
+        await prisma.paymentRequestToUser.deleteMany({
+            where: {
+                userId: {
+                    in: Array.from(toDelete),
+                },
+            },
+        });
+    }
 
     return NextResponse.json({ request: newRequest });
 }

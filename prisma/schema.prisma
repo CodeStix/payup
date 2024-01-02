@@ -18,9 +18,22 @@ model User {
   lastLoginDate DateTime @default(now())
   avatarUrl     String?
 
-  requestedToPay PaymentRequestToUser[]
-
   paymentRequests PaymentRequest[]
+  requestedToPay  PaymentRequestToUser[]
+
+  // This user has initiated a connection to these users
+  requesters UserToUser[] @relation("requesters")
+  // This user is related to because they initiated a connected to this user
+  responders UserToUser[] @relation("responders")
+}
+
+model UserToUser {
+  requester   User @relation(fields: [requesterId], references: [id], name: "requesters")
+  requesterId Int
+  responder   User @relation(fields: [responderId], references: [id], name: "responders")
+  responderId Int
+
+  @@id([requesterId, responderId])
 }
 
 model PaymentRequestToUser {
