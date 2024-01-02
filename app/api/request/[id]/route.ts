@@ -93,7 +93,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         },
         data: {
             description: body.description || "",
-            name: body.name || "no name",
+            name: body.name || undefined,
             paidById: body.paidBy?.id || undefined,
             amount: body.amount || undefined,
             usersToPay: body.usersToPay

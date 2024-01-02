@@ -1,21 +1,44 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, User } from "@prisma/client";
+import AWS, { SES } from "aws-sdk";
 
 const prisma = new PrismaClient();
 
-export async function notifyUsers() {
+const { AWS_REGION, AWS_SES_KEY, AWS_SES_SECRET, AWS_SES_SOURCE } = process.env;
+
+AWS.config.update({
+    region: AWS_REGION,
+    credentials: {
+        accessKeyId: AWS_SES_KEY!,
+        secretAccessKey: AWS_SES_SECRET!,
+    },
+});
+
+let ses = new AWS.SES();
+
+export async function calculateOwingUsers() {
     const payingUserOpenRequests = await prisma.paymentRequestToUser.findMany({
         where: {
             paymentComplete: false,
         },
         select: {
-            userId: true,
+            user: {
+                select: {
+                    id: true,
+                    email: true,
+                },
+            },
             partsOfAmount: true,
             lastNotificationDate: true,
             payedAmount: true,
             paymentRequest: {
                 select: {
                     id: true,
-                    paidById: true,
+                    paidBy: {
+                        select: {
+                            id: true,
+                            email: true,
+                        },
+                    },
                     amount: true,
                 },
             },
@@ -29,12 +52,12 @@ export async function notifyUsers() {
         partsPerRequest.set(paymentRequestId, (partsPerRequest.get(paymentRequestId) ?? 0) + paymentPerUser.partsOfAmount);
     }
 
-    const balancePerUserPair = new Map<string, { owsId: number; paidById: number; amount: number }>();
+    const balancePerUserPair = new Map<string, { ows: User; paidBy: User; amount: number }>();
 
     for (const paymentPerUser of payingUserOpenRequests) {
         const partsInRequest = partsPerRequest.get(paymentPerUser.paymentRequest.id)!;
-        const paidById = paymentPerUser.paymentRequest.paidById;
-        const owsId = paymentPerUser.userId;
+        const paidById = paymentPerUser.paymentRequest.paidBy.id;
+        const owsId = paymentPerUser.user.id;
 
         const stillOws = (paymentPerUser.partsOfAmount / partsInRequest) * paymentPerUser.paymentRequest.amount - paymentPerUser.payedAmount;
 
@@ -44,7 +67,7 @@ export async function notifyUsers() {
             await prisma.paymentRequestToUser.update({
                 where: {
                     userId_paymentRequestId: {
-                        userId: paymentPerUser.userId,
+                        userId: paymentPerUser.user.id,
                         paymentRequestId: paymentPerUser.paymentRequest.id,
                     },
                 },
@@ -67,8 +90,8 @@ export async function notifyUsers() {
                 } else {
                     balancePerUserPair.set(userPairKey, {
                         amount: stillOws,
-                        owsId: owsId,
-                        paidById: paidById,
+                        ows: paymentPerUser.user as User,
+                        paidBy: paymentPerUser.paymentRequest.paidBy as User,
                     });
                 }
             }
@@ -76,6 +99,49 @@ export async function notifyUsers() {
     }
 
     for (const owing of Array.from(balancePerUserPair.values())) {
-        console.log(owing.owsId, "ows", owing.paidById, "amount", owing.amount);
+        console.log(owing.ows.email, "ows", owing.paidBy.email, "amount", owing.amount);
     }
+
+    return Array.from(balancePerUserPair.values());
+}
+
+export async function notifyUsers() {
+    let owing = await calculateOwingUsers();
+
+    for (let o of owing) {
+        if (o.amount >= 0) {
+            await sendMail(o.ows.email, `You still owe ${o.paidBy.userName} money, pay up!`, "");
+        } else {
+            await sendMail(o.paidBy.email, `You still owe ${o.ows.userName} money, pay up!`, "");
+        }
+    }
+}
+
+async function sendMail(receiver: string, subject: string, body: string) {
+    if (receiver === "reddusted@gmail.com" || receiver === "stijn.rogiest@gmail.com")
+        await ses
+            .sendEmail({
+                Destination: {
+                    ToAddresses: [receiver],
+                },
+                Message: {
+                    Body: {
+                        // Html: {
+
+                        // },
+                        Text: {
+                            Data: body,
+                        },
+                    },
+                    Subject: {
+                        Data: subject,
+                    },
+                },
+                Source: AWS_SES_SOURCE!,
+            })
+            .promise()
+            .then((e) => {
+                console.log("Sent mail to", receiver);
+            });
+    else console.warn("Sent email to (skipped)", receiver);
 }
