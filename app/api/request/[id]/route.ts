@@ -107,10 +107,12 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                           },
                           update: {
                               partsOfAmount: u.partsOfAmount || 1,
+                              paymentComplete: false, // Maybe it got updated, recheck it during next cron job
                           },
                           create: {
                               userId: u.user.id,
                               partsOfAmount: u.partsOfAmount || 1,
+                              paymentComplete: false,
                           },
                       })),
                   }

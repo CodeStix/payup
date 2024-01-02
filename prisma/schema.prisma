@@ -47,6 +47,10 @@ model PaymentRequestToUser {
 
   createdDate DateTime @default(now())
 
+  paymentComplete      Boolean   @default(false)
+  lastNotificationDate DateTime?
+  payedAmount          Float     @default(0)
+
   @@id([userId, paymentRequestId])
 }
 
