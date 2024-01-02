@@ -12,7 +12,35 @@ datasource db {
 
 model User {
   id            Int      @id
-  userName      String
+  userName      String?
+  email         String
   registerDate  DateTime @default(now())
   lastLoginDate DateTime @default(now())
+
+  requestedToPay PaymentRequestToUser[]
+
+  paymentRequests PaymentRequest[]
+}
+
+model PaymentRequestToUser {
+  user             User           @relation(fields: [userId], references: [id])
+  userId           Int
+  paymentRequest   PaymentRequest @relation(fields: [paymentRequestId], references: [id])
+  paymentRequestId String
+
+  createdDate DateTime @default(now())
+
+  @@id([userId, paymentRequestId])
+}
+
+model PaymentRequest {
+  id          String   @id @default(uuid())
+  name        String
+  description String
+  createdDate DateTime @default(now())
+
+  usersToPay PaymentRequestToUser[]
+
+  owner   User @relation(fields: [ownerId], references: [id])
+  ownerId Int
 }
