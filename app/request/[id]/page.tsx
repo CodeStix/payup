@@ -3,7 +3,7 @@
 import { AppHeader } from "@/components/AppHeader";
 import { EditableControls } from "@/components/EditableControls";
 import { LogOutButton } from "@/components/LogOutButton";
-import { fetcher } from "@/util";
+import { fetcher, removeEmailDomain } from "@/util";
 import {
     Flex,
     Heading,
@@ -36,21 +36,51 @@ import {
     Spacer,
     InputRightElement,
 } from "@chakra-ui/react";
-import { faChevronLeft, faPlus, faSearch, faTimes } from "@fortawesome/free-solid-svg-icons";
+import { faChevronLeft, faCoins, faMoneyBill, faMoneyBill1Wave, faPlus, faSave, faSearch, faTimes } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { PaymentRequest, User } from "@prisma/client";
 import { useSession, signOut } from "next-auth/react";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 
-export default function Home({ params }: { params: { id: string } }) {
+export default function PaymentRequestDetailPage({ params }: { params: { id: string } }) {
+    const router = useRouter();
     const { status: status } = useSession();
     const [userQuery, setUserQuery] = useState("");
     const [activeUserQuery, setActiveUserQuery] = useState("");
     const [amount, setAmount] = useState<string>("");
     const [isUpdating, setUpdating] = useState(false);
-    const { data, isLoading, mutate } = useSWR<PaymentRequest & { usersToPay: { user: User }[] }>("/api/request/" + params.id, fetcher);
-    const { data: users, isLoading: usersIsLoading } = useSWR<User[]>("/api/user/search?query=" + encodeURIComponent(activeUserQuery), fetcher);
+    const {
+        data: request,
+        isLoading: requestIsLoading,
+        mutate: mutateRequest,
+    } = useSWR<PaymentRequest & { usersToPay: { user: User; partsOfAmount: number }[] }>("/api/request/" + params.id, fetcher);
+    const { data: searchResults, isLoading: searchResultsAreLoading } = useSWR<User[]>(
+        "/api/user/search?query=" + encodeURIComponent(activeUserQuery),
+        fetcher
+    );
+    const filteredSearchResults = useMemo(
+        () => (searchResults && request ? searchResults.filter((e) => !request.usersToPay.some((f) => f.user.id === e.id)) : []),
+        [searchResults, request]
+    );
+
+    const totalParts = useMemo(() => {
+        let parts = 0;
+        for (let u of request?.usersToPay ?? []) {
+            parts += u.partsOfAmount;
+        }
+        if (parts <= 0) {
+            parts = 1;
+        }
+        return parts;
+    }, [request?.usersToPay]);
+
+    useEffect(() => {
+        if (request) {
+            setAmount(String(request.amount));
+        }
+    }, [request?.amount]);
 
     useEffect(() => {
         function updateActiveQuery() {
@@ -63,7 +93,7 @@ export default function Home({ params }: { params: { id: string } }) {
         };
     }, [userQuery]);
 
-    async function patch(n: Partial<PaymentRequest & { usersToPay: { id: number }[] }>) {
+    async function patch(n: Partial<PaymentRequest & { usersToPay: { user: { id: number }; partsOfAmount: number }[] }>) {
         setUpdating(true);
         try {
             const res = await fetch(`/api/request/${params.id}`, {
@@ -75,7 +105,7 @@ export default function Home({ params }: { params: { id: string } }) {
                 throw new Error("Could not patch");
             }
 
-            await mutate();
+            await mutateRequest();
         } finally {
             setUpdating(false);
         }
@@ -97,14 +127,14 @@ export default function Home({ params }: { params: { id: string } }) {
     }
 
     async function createNewUserAndBind(email: string) {
-        if (!users) {
+        if (!searchResults) {
             console.error("Cannot createNewUserAndBind, not loaded");
             return;
         }
 
         setUpdating(true);
         try {
-            let user = users.find((e) => e.email === email);
+            let user = searchResults.find((e) => e.email === email);
             if (!user) {
                 user = await createNewUser(email);
             }
@@ -116,14 +146,14 @@ export default function Home({ params }: { params: { id: string } }) {
     }
 
     async function bindUser(user: User) {
-        if (!data) {
+        if (!request) {
             console.error("Cannot bindUser, not loaded");
             return;
         }
         setUpdating(true);
         try {
             await patch({
-                usersToPay: [...data.usersToPay.map((e) => e.user), user],
+                usersToPay: [...request.usersToPay, { user: user, partsOfAmount: 1 }],
             });
         } finally {
             setUpdating(false);
@@ -131,17 +161,29 @@ export default function Home({ params }: { params: { id: string } }) {
     }
 
     async function unbindUser(user: User) {
-        if (!data) {
+        if (!request) {
             console.error("Cannot unbindUser, not loaded");
             return;
         }
         setUpdating(true);
         try {
             await patch({
-                usersToPay: data.usersToPay.filter((e) => e.user.id !== user.id).map((e) => e.user),
+                usersToPay: request.usersToPay.filter((e) => e.user.id !== user.id),
             });
         } finally {
             setUpdating(false);
+        }
+    }
+
+    async function updateAmount(amountStr: string) {
+        const amount = parseFloat(amountStr);
+        if (isNaN(amount)) {
+            console.error("Invalid amount");
+        } else if (amount !== request?.amount) {
+            console.log(amount, request?.amount);
+            await patch({
+                amount: amount,
+            });
         }
     }
 
@@ -152,17 +194,17 @@ export default function Home({ params }: { params: { id: string } }) {
 
                 <Divider />
 
-                <Skeleton isLoaded={!!data}>
-                    <Heading as="h2">
+                <Skeleton isLoaded={!!request}>
+                    <Heading as="h2" fontSize="x-large">
                         <Editable
                             display="flex"
                             alignItems="center"
                             gap={2}
                             flexWrap="nowrap"
                             isDisabled={isUpdating}
-                            defaultValue={data?.name}
+                            defaultValue={request?.name}
                             onSubmit={(ev) => {
-                                if (ev !== data?.name) {
+                                if (ev !== request?.name) {
                                     void patch({
                                         name: ev,
                                     });
@@ -175,31 +217,46 @@ export default function Home({ params }: { params: { id: string } }) {
                     </Heading>
                 </Skeleton>
 
-                <Skeleton isLoaded={!!data}>
-                    <FormControl isDisabled={isUpdating}>
-                        <FormLabel>Total amount</FormLabel>
-                        <NumberInput autoFocus value={amount} onChange={(ev) => setAmount(ev)} max={100000} min={1}>
-                            <InputGroup>
-                                <InputLeftAddon>€</InputLeftAddon>
-                                <NumberInputField borderLeftRadius={0} />
-                            </InputGroup>
-                            <NumberInputStepper>
-                                <NumberIncrementStepper />
-                                <NumberDecrementStepper />
-                            </NumberInputStepper>
-                        </NumberInput>
+                <Skeleton isLoaded={!!request}>
+                    <form
+                        onSubmit={(ev) => {
+                            ev.preventDefault();
+                            void updateAmount(amount);
+                        }}>
+                        <FormControl isDisabled={isUpdating}>
+                            <FormLabel>Total amount</FormLabel>
+                            <NumberInput
+                                onBlur={(ev) => {
+                                    setAmount(ev.target.value);
+                                    void updateAmount(ev.target.value);
+                                }}
+                                autoFocus
+                                value={amount}
+                                onChange={(ev) => setAmount(ev)}
+                                max={100000}
+                                min={1}>
+                                <InputGroup>
+                                    <InputLeftAddon>€</InputLeftAddon>
+                                    <NumberInputField borderLeftRadius={0} />
+                                </InputGroup>
+                                <NumberInputStepper>
+                                    <NumberIncrementStepper />
+                                    <NumberDecrementStepper />
+                                </NumberInputStepper>
+                            </NumberInput>
 
-                        <FormHelperText>This amount will be divided over your friends.</FormHelperText>
-                    </FormControl>
+                            <FormHelperText>Paid by you. This amount will be divided over your friends.</FormHelperText>
+                        </FormControl>
+                    </form>
                 </Skeleton>
 
                 <form
                     style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
                     onSubmit={(ev) => {
-                        void createNewUserAndBind(userQuery);
+                        // void createNewUserAndBind(userQuery);
                         ev.preventDefault();
                     }}>
-                    <Skeleton isLoaded={!!data}>
+                    <Skeleton isLoaded={!!request}>
                         <FormControl isDisabled={isUpdating}>
                             <FormLabel>Who has to Pay Up?</FormLabel>
                             <InputGroup>
@@ -223,58 +280,71 @@ export default function Home({ params }: { params: { id: string } }) {
                             </InputGroup>
 
                             {/* <FormHelperText>
-                                <pre>{JSON.stringify(users, null, 2)}</pre>
+                                You can also enter an email address.
                             </FormHelperText> */}
                         </FormControl>
                     </Skeleton>
                 </form>
 
-                {userQuery.includes("@") && !usersIsLoading && !isUpdating && (users?.length ?? 0) === 0 && userQuery === activeUserQuery && (
-                    <Button
-                        // isDisabled={isUpdating || usersIsLoading || userQuery !== activeUserQuery}
-                        onClick={() => void createNewUserAndBind(userQuery)}
-                        w="full"
-                        size="md"
-                        variant={"solid"}
-                        colorScheme="green">
-                        Add&nbsp;<Box>{userQuery}</Box>
-                    </Button>
-                )}
-                <Skeleton isLoaded={users && userQuery === activeUserQuery}>
+                {userQuery.includes("@") &&
+                    !searchResultsAreLoading &&
+                    !isUpdating &&
+                    (searchResults?.length ?? 0) === 0 &&
+                    userQuery === activeUserQuery && (
+                        <Button
+                            // isDisabled={isUpdating || usersIsLoading || userQuery !== activeUserQuery}
+                            onClick={() => void createNewUserAndBind(userQuery)}
+                            w="full"
+                            size="md"
+                            variant={"solid"}
+                            colorScheme="green">
+                            Add&nbsp;<Box>{userQuery}</Box>
+                        </Button>
+                    )}
+                <Skeleton isLoaded={request && searchResults && userQuery === activeUserQuery}>
                     <Text as="p" opacity={0.5}>
-                        {(users?.length ?? 0) === 0 ? "No results" : userQuery ? "Search results" : "Recommended users"}
+                        {filteredSearchResults.length === 0 ? "No results" : userQuery ? "Search results" : "Recommended users"}
                     </Text>
                     <UnorderedList ml={0}>
-                        {users &&
-                            data &&
-                            users
-                                .filter((e) => !data.usersToPay.some((f) => f.user.id === e.id))
-                                .map((u) => (
-                                    <ListItem my={1} display="flex" key={u.id} alignItems="center" gap={2}>
-                                        <Avatar size="sm" name={u.userName || u.email} src={u.avatarUrl || undefined} />
-                                        <Text fontWeight={"semibold"}>{u.userName || u.email}</Text>
-                                        <Spacer />
-                                        <IconButton
-                                            isDisabled={isUpdating}
-                                            onClick={() => void bindUser(u)}
-                                            size="sm"
-                                            colorScheme="green"
-                                            aria-label="Add user"
-                                            icon={<FontAwesomeIcon icon={faPlus} />}></IconButton>
-                                    </ListItem>
-                                ))}
+                        {filteredSearchResults.map((u) => (
+                            <ListItem my={1} display="flex" key={u.id} alignItems="center" gap={2}>
+                                <Avatar size="sm" name={u.userName || u.email} src={u.avatarUrl || undefined} />
+                                <Text wordBreak="break-word" fontWeight="normal">
+                                    {u.userName || removeEmailDomain(u.email)}
+                                </Text>
+                                <Spacer />
+                                <IconButton
+                                    isDisabled={isUpdating}
+                                    onClick={() => void bindUser(u)}
+                                    size="sm"
+                                    colorScheme="green"
+                                    aria-label="Add user"
+                                    icon={<FontAwesomeIcon icon={faPlus} />}></IconButton>
+                            </ListItem>
+                        ))}
                     </UnorderedList>
                 </Skeleton>
 
                 <Divider />
 
-                <Skeleton isLoaded={!!data}>
+                <Skeleton isLoaded={!!request}>
+                    {(request?.usersToPay.length ?? 0) > 0 && (
+                        <Text as="p" fontWeight="bold" color="green.500">
+                            <FontAwesomeIcon icon={faCoins} /> Paying users
+                        </Text>
+                    )}
                     <UnorderedList ml={0}>
-                        {data?.usersToPay.map((e) => (
+                        {request?.usersToPay.map((e) => (
                             <ListItem my={1} display="flex" key={e.user.id} alignItems="center" gap={2}>
                                 <Avatar size="sm" name={e.user.userName || e.user.email} src={e.user.avatarUrl || undefined} />
-                                <Text fontWeight={"semibold"}>{e.user.userName || e.user.email}</Text>
+                                <Text wordBreak="break-word" fontWeight="normal">
+                                    {e.user.userName || removeEmailDomain(e.user.email)}
+                                </Text>
                                 <Spacer />
+
+                                <Text color="green.500" mx={1} fontWeight="semibold" whiteSpace="nowrap">
+                                    € {((e.partsOfAmount / totalParts) * request.amount).toFixed(2)}
+                                </Text>
                                 <IconButton
                                     isDisabled={isUpdating}
                                     onClick={() => void unbindUser(e.user)}
@@ -287,18 +357,9 @@ export default function Home({ params }: { params: { id: string } }) {
                     </UnorderedList>
                 </Skeleton>
 
-                {/* <Button size="lg" colorScheme="orange" rightIcon={<FontAwesomeIcon icon={faArrowRight} />} onClick={() => signIn("google")}>
-                Create Payment Request
-            </Button> */}
-                <Skeleton isLoaded={!isLoading} minHeight={"2rem"}>
-                    {/* <pre>{JSON.stringify(data, null, 2)}</pre> */}
-                    {/* {data?.requests.map((e) => (
-                        <p>{e.name}</p>
-                    ))} */}
-                    {/* {data?.requests.length === 0 && <Button colorScheme="orange">Create first payment request</Button>} */}
-                </Skeleton>
-
-                {/* <pre>{JSON.stringify({ data }, null, 2)}</pre> */}
+                <Button mt={"auto"} size="lg" colorScheme="orange" rightIcon={<FontAwesomeIcon icon={faSave} />} onClick={() => router.back()}>
+                    Send it
+                </Button>
 
                 <LogOutButton />
             </Flex>

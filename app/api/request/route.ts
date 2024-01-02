@@ -23,6 +23,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
                     email: session.user.email,
                 },
             },
+            paidBy: {
+                connect: {
+                    email: session.user.email,
+                },
+            },
         },
     });
 

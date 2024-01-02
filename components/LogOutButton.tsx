@@ -23,14 +23,13 @@ export function LogOutButton(props: { small?: boolean }) {
         <IconButton
             icon={<FontAwesomeIcon icon={faSignOut} />}
             aria-label="sign out"
-            mt={"auto"}
             variant="solid"
             isDisabled={loading}
             colorScheme="red"
             onClick={logOut}
         />
     ) : (
-        <Button mt={"auto"} variant="outline" isDisabled={loading} colorScheme="red" onClick={logOut}>
+        <Button variant="outline" isDisabled={loading} colorScheme="red" onClick={logOut}>
             Sign out
         </Button>
     );

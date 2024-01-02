@@ -11,7 +11,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
         return NextResponse.json({}, { status: 401 });
     }
 
-    const r = await prisma.paymentRequest.findUnique({
+    const paymentRequest = await prisma.paymentRequest.findUnique({
         where: {
             id: params.id,
             owner: {
@@ -19,6 +19,14 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
             },
         },
         include: {
+            paidBy: {
+                select: {
+                    email: true,
+                    id: true,
+                    userName: true,
+                    avatarUrl: true,
+                },
+            },
             usersToPay: {
                 include: {
                     user: {
@@ -34,7 +42,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
         },
     });
 
-    return NextResponse.json(r, { status: !r ? 404 : 200 });
+    return NextResponse.json(paymentRequest, { status: !paymentRequest ? 404 : 200 });
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }): Promise<NextResponse> {
@@ -64,8 +72,15 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const body = (await request.json()) as {
         name: string;
         description: string;
-        usersToPay?: {
+        amount: number;
+        paidBy?: {
             id: number;
+        };
+        usersToPay?: {
+            user: {
+                id: number;
+            };
+            partsOfAmount?: number;
         }[];
     };
 
@@ -77,25 +92,39 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
             },
         },
         data: {
-            description: body.description,
-            name: body.name,
+            description: body.description || "",
+            name: body.name || "no name",
+            paidById: body.paidBy?.id || undefined,
+            amount: body.amount || undefined,
             usersToPay: body.usersToPay
                 ? {
-                      connectOrCreate: body.usersToPay.map((u) => ({
+                      upsert: body.usersToPay.map((u) => ({
                           where: {
                               userId_paymentRequestId: {
                                   paymentRequestId: params.id,
-                                  userId: u.id,
+                                  userId: u.user.id,
                               },
                           },
+                          update: {
+                              partsOfAmount: u.partsOfAmount || 1,
+                          },
                           create: {
-                              userId: u.id,
+                              userId: u.user.id,
+                              partsOfAmount: u.partsOfAmount || 1,
                           },
                       })),
                   }
                 : {},
         },
         include: {
+            paidBy: {
+                select: {
+                    email: true,
+                    id: true,
+                    userName: true,
+                    avatarUrl: true,
+                },
+            },
             usersToPay: {
                 include: {
                     user: {
@@ -113,7 +142,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     if (body.usersToPay) {
         const toDelete = new Set(newRequest.usersToPay.map((e) => e.userId));
-        body.usersToPay.forEach((e) => toDelete.delete(e.id));
+        body.usersToPay.forEach((e) => toDelete.delete(e.user.id));
 
         await prisma.paymentRequestToUser.deleteMany({
             where: {
