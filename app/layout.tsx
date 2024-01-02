@@ -3,6 +3,10 @@ import { Rubik } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
+import { config } from "@fortawesome/fontawesome-svg-core";
+import "@fortawesome/fontawesome-svg-core/styles.css";
+config.autoAddCss = false;
+
 const rubik = Rubik({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
