@@ -35,8 +35,25 @@ import {
     Avatar,
     Spacer,
     InputRightElement,
+    Popover,
+    PopoverArrow,
+    PopoverBody,
+    PopoverCloseButton,
+    PopoverContent,
+    PopoverHeader,
+    PopoverTrigger,
 } from "@chakra-ui/react";
-import { faChevronLeft, faCoins, faMoneyBill, faMoneyBill1Wave, faPlus, faSave, faSearch, faTimes } from "@fortawesome/free-solid-svg-icons";
+import {
+    faChevronLeft,
+    faCoins,
+    faMoneyBill,
+    faMoneyBill1Wave,
+    faPlus,
+    faSave,
+    faSearch,
+    faSubtract,
+    faTimes,
+} from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { PaymentRequest, User } from "@prisma/client";
 import { useSession, signOut } from "next-auth/react";
@@ -105,6 +122,7 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                 throw new Error("Could not patch");
             }
 
+            console.log("set", { ...request, ...n });
             await mutateRequest();
         } finally {
             setUpdating(false);
@@ -145,7 +163,7 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
         }
     }
 
-    async function bindUser(user: User) {
+    async function bindUser(user: User, partsOfAmount: number = 1) {
         if (!request) {
             console.error("Cannot bindUser, not loaded");
             return;
@@ -153,7 +171,7 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
         setUpdating(true);
         try {
             await patch({
-                usersToPay: [...request.usersToPay, { user: user, partsOfAmount: 1 }],
+                usersToPay: [...request.usersToPay.filter((e) => e.user.id !== user.id), { user: user, partsOfAmount: partsOfAmount }],
             });
         } finally {
             setUpdating(false);
@@ -342,9 +360,45 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                                 </Text>
                                 <Spacer />
 
-                                <Text color="green.500" mx={1} fontWeight="semibold" whiteSpace="nowrap">
-                                    € {((e.partsOfAmount / totalParts) * request.amount).toFixed(2)}
-                                </Text>
+                                <Popover>
+                                    <PopoverTrigger>
+                                        <Button variant="link" color="green.500" mx={1} fontWeight="semibold" whiteSpace="nowrap">
+                                            € {((e.partsOfAmount / totalParts) * request.amount).toFixed(2)}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent>
+                                        <PopoverArrow />
+                                        <PopoverCloseButton />
+                                        <PopoverHeader>Fraction of total amount</PopoverHeader>
+                                        <PopoverBody>
+                                            <Flex alignItems="center" gap={2}>
+                                                <IconButton
+                                                    onClick={() => {
+                                                        void bindUser(e.user, e.partsOfAmount - 1);
+                                                    }}
+                                                    colorScheme="blue"
+                                                    isDisabled={isUpdating || e.partsOfAmount <= 1}
+                                                    aria-label="Less fraction of amount"
+                                                    icon={<FontAwesomeIcon icon={faSubtract} />}></IconButton>
+                                                <Text px={2} as="span">
+                                                    {e.partsOfAmount}
+                                                </Text>
+                                                <IconButton
+                                                    isDisabled={isUpdating}
+                                                    onClick={() => {
+                                                        void bindUser(e.user, e.partsOfAmount + 1);
+                                                    }}
+                                                    colorScheme="blue"
+                                                    aria-label="More fraction of amount"
+                                                    icon={<FontAwesomeIcon icon={faPlus} />}></IconButton>
+                                                {/* <Text whiteSpace={"nowrap"} as="p" opacity={0.5}>
+                                                    parts of {request.amount}.
+                                                </Text> */}
+                                            </Flex>
+                                        </PopoverBody>
+                                    </PopoverContent>
+                                </Popover>
+
                                 <IconButton
                                     isDisabled={isUpdating}
                                     onClick={() => void unbindUser(e.user)}
