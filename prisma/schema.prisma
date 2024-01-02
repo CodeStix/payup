@@ -11,11 +11,12 @@ datasource db {
 }
 
 model User {
-  id            Int      @id
+  id            Int      @id @default(autoincrement())
   userName      String?
-  email         String
+  email         String   @unique
   registerDate  DateTime @default(now())
   lastLoginDate DateTime @default(now())
+  avatarUrl     String?
 
   requestedToPay PaymentRequestToUser[]
 

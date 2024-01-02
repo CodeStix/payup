@@ -1,22 +1,34 @@
 "use client";
 
-import { Button, Text, Center, Heading } from "@chakra-ui/react";
+import { Button, Text, Center, Heading, Skeleton } from "@chakra-ui/react";
 import { faArrowRight } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { signIn, signOut, useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export default function Home() {
-    const { data: session } = useSession();
+    const router = useRouter();
+    const { status: status } = useSession();
+
+    useEffect(() => {
+        if (status === "authenticated") {
+            router.push("/request");
+        }
+    }, [status]);
 
     return (
         <Center style={{ height: "100%", flexDirection: "column", gap: "1em" }}>
             <Heading as="h1">Pay Up!</Heading>
-            <Button size="lg" colorScheme="orange" rightIcon={<FontAwesomeIcon icon={faArrowRight} />} onClick={() => signIn("google")}>
-                Create Payment Request
-            </Button>
-            <Text style={{ opacity: "0.5" }}>You'll need to log in using Google to create a payment request.</Text>
-            <pre>{JSON.stringify(session, null, 2)}</pre>
-            <Button onClick={() => signOut()}>log out</Button>
+
+            <Skeleton isLoaded={status === "unauthenticated"}>
+                <Button size="lg" colorScheme="orange" rightIcon={<FontAwesomeIcon icon={faArrowRight} />} onClick={() => signIn("google")}>
+                    Create Payment Request
+                </Button>
+            </Skeleton>
+            <Skeleton isLoaded={status === "unauthenticated"}>
+                <Text style={{ opacity: "0.5" }}>You'll need to log in using Google to create a payment request.</Text>
+            </Skeleton>
         </Center>
     );
 }

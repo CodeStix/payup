@@ -4,11 +4,11 @@ import useSWR from "swr";
 import { Button, Text, Center, Heading } from "@chakra-ui/react";
 import { faArrowRight } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { signIn, useSession } from "next-auth/react";
+import { signIn, signOut, useSession } from "next-auth/react";
 import { fetcher } from "@/util";
 
 export default function Home() {
-    // const { data: session } = useSession();
+    const { status: status } = useSession();
     const { data } = useSWR("/api/request", fetcher);
 
     return (
@@ -20,6 +20,7 @@ export default function Home() {
             <Text as="p">Logged in</Text>
             {/* <Text style={{ opacity: "0.5" }}>You'll need to log in using Google to create a payment request.</Text> */}
             <pre>{JSON.stringify({ data }, null, 2)}</pre>
+            <Button onClick={() => signOut()}>log out</Button>
         </Center>
     );
 }
