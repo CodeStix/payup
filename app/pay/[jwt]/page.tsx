@@ -71,11 +71,11 @@ export default function Home({ params }: { params: { jwt: string } }) {
 
             <Skeleton isLoaded={!!paymentLink}>
                 {paymentLink?.paymentMethod === "mollie" && paymentLink.paid ? (
-                    <Heading color="green.500">
+                    <Heading color="green.500" textAlign="center">
                         You paid €{paymentLink?.amount.toFixed(2)} to {senderDisplayName}.
                     </Heading>
                 ) : (
-                    <Heading as="h2">
+                    <Heading as="h2" textAlign="center">
                         You still owe {senderDisplayName} €{paymentLink?.amount.toFixed(2)}!
                     </Heading>
                 )}
@@ -85,7 +85,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
                 paymentLink?.paid &&
                 paymentLink.paidDate &&
                 new Date().getTime() - new Date(paymentLink.paidDate).getTime() > 60 * 1000 && (
-                    <Alert status="warning" rounded="lg" maxW="lg" flexDir="column">
+                    <Alert status="warning" rounded="lg" maxW="lg" flexDir="column" textAlign="center">
                         <Flex>
                             <AlertIcon />
                             <AlertTitle>You already paid?</AlertTitle>
@@ -130,7 +130,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
             </Skeleton>
 
             <Skeleton isLoaded={!!paymentLink}>
-                <Text style={{ opacity: "0.5", maxWidth: "500px", textAlign: "center", minHeight: "2rem" }}>
+                <Text style={{ opacity: "0.5", maxWidth: "500px", textAlign: "center", minHeight: "2rem" }} textAlign="center">
                     {paymentLink?.paymentMethod === "mollie" ? (
                         <>
                             {senderDisplayName} selected{" "}
@@ -141,7 +141,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
                         </>
                     ) : (
                         <>
-                            Open your banking app and send €{paymentLink?.amount.toFixed(2) ?? 0} it to {senderDisplayName} (
+                            Open your banking app and send €{paymentLink?.amount.toFixed(2) ?? 0} to {senderDisplayName} (
                             {paymentLink?.sendingUser.iban}). You can close this page if you already paid it, you won't be notified again.
                         </>
                     )}
