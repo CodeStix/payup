@@ -484,7 +484,7 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                                     Delete payment request
                                 </AlertDialogHeader>
 
-                                <AlertDialogBody>Are you sure? You can't undo this action afterwards.</AlertDialogBody>
+                                <AlertDialogBody>Are you sure? You can&apos;t undo this action afterwards.</AlertDialogBody>
 
                                 <AlertDialogFooter>
                                     <Button ref={cancelRef} onClick={onCloseDelete}>
@@ -546,7 +546,7 @@ function PaymentStatusButton(props: {
                     Payment status:{" "}
                     {paidLess ? (
                         <Text as="span" fontWeight="semibold" color="red.500">
-                            <FontAwesomeIcon icon={faWarning} /> Didn't pay enough
+                            <FontAwesomeIcon icon={faWarning} /> Didn&apos;t pay enough
                         </Text>
                     ) : paidTooMuch ? (
                         <Text as="span" fontWeight="semibold" color="green.500">
@@ -565,12 +565,12 @@ function PaymentStatusButton(props: {
                 <PopoverBody display="flex" gap={2} flexDir="column">
                     {paidTooMuch && (
                         <Text as="p" opacity={0.5}>
-                            But don't worry, you will be notified automatically when you should pay it back.
+                            But don&apos;t worry, you will be notified automatically when you should pay it back.
                         </Text>
                     )}
                     {paidLess && (
                         <Text as="p" opacity={0.5}>
-                            But don't worry, they will be notified automatically when they should pay you again.
+                            But don&apos;t worry, they will be notified automatically when they should pay you again.
                         </Text>
                     )}
 

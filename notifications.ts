@@ -227,30 +227,30 @@ export async function notifyUsers() {
 }
 
 async function sendMail(receiver: string, subject: string, body: string) {
-    if (receiver === "reddusted@gmail.com" || receiver === "stijn.rogiest@gmail.com")
-        await ses
-            .sendEmail({
-                Destination: {
-                    ToAddresses: [receiver],
-                },
-                Message: {
-                    Body: {
-                        Html: {
-                            Data: body,
-                        },
-                        Text: {
-                            Data: htmlToText(body),
-                        },
+    // if (receiver === "reddusted@gmail.com" || receiver === "stijn.rogiest@gmail.com")
+    await ses
+        .sendEmail({
+            Destination: {
+                ToAddresses: [receiver],
+            },
+            Message: {
+                Body: {
+                    Html: {
+                        Data: body,
                     },
-                    Subject: {
-                        Data: subject,
+                    Text: {
+                        Data: htmlToText(body),
                     },
                 },
-                Source: AWS_SES_SOURCE!,
-            })
-            .promise()
-            .then((e) => {
-                console.log("Sent mail to", receiver);
-            });
-    else console.warn("Sent email to (skipped)", receiver, subject);
+                Subject: {
+                    Data: subject,
+                },
+            },
+            Source: AWS_SES_SOURCE!,
+        })
+        .promise()
+        .then((e) => {
+            console.log("Sent mail to", receiver);
+        });
+    // else console.warn("Sent email to (skipped)", receiver, subject);
 }

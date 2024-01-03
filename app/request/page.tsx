@@ -93,6 +93,7 @@ export default function HomePage() {
 
                         {data?.requests?.map((e) => (
                             <Card
+                                key={e.id}
                                 // colorScheme="green"
                                 background="#eee"
                                 shadow="none"

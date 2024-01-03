@@ -146,7 +146,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
                     ) : (
                         <>
                             Open your banking app and send €{paymentLink?.amount.toFixed(2) ?? 0} to {senderDisplayName} (
-                            {paymentLink?.sendingUser.iban}). You can close this page if you already paid it, you won't be notified again.
+                            {paymentLink?.sendingUser.iban}). You can close this page if you already paid it, you won&apos;t be notified again.
                         </>
                     )}
                 </Text>
