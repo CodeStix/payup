@@ -147,6 +147,21 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     });
 
     if (body.usersToPay) {
+        const currentUser = await prisma.user.findUniqueOrThrow({
+            where: {
+                email: session.user.email,
+            },
+            select: {
+                id: true,
+            },
+        });
+        await prisma.userToUser.createMany({
+            skipDuplicates: true,
+            data: body.usersToPay.map((e) => ({ requesterId: currentUser.id, responderId: e.user.id })),
+        });
+    }
+
+    if (body.usersToPay) {
         const toDelete = new Set(newRequest.usersToPay.map((e) => e.userId));
         body.usersToPay.forEach((e) => toDelete.delete(e.user.id));
 

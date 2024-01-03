@@ -1,6 +1,5 @@
 "use client";
 
-import type { JwtPayload } from "@/notifications";
 import { removeEmailDomain } from "@/util";
 import { Button, Text, Center, Heading, Skeleton, AlertTitle, Alert, AlertIcon, Flex } from "@chakra-ui/react";
 import { faArrowRight, faCheckCircle, faClipboard, faClipboardCheck } from "@fortawesome/free-solid-svg-icons";

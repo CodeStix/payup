@@ -62,7 +62,7 @@ export async function calculateOwingUsers() {
 
     const balancePerUserPair = new Map<
         string,
-        { ows: User; paidBy: User; amount: number; settlesPaymentsRequests: { paymentRequestId: string; amount: number }[] }
+        { ows: User; paidBy: User; amount: number; settlesPaymentsRequests: { paymentRequestId: string; userId: number; amount: number }[] }
     >();
 
     for (const paymentPerUser of payingUserOpenRequests) {
@@ -96,19 +96,29 @@ export async function calculateOwingUsers() {
             if (balancePerUserPair.has(userPairKey)) {
                 const current = balancePerUserPair.get(userPairKey)!;
                 current.amount += stillOws;
-                current.settlesPaymentsRequests.push({ paymentRequestId: paymentPerUser.paymentRequest.id, amount: stillOws });
+                current.settlesPaymentsRequests.push({
+                    paymentRequestId: paymentPerUser.paymentRequest.id,
+                    userId: paymentPerUser.user.id,
+                    amount: stillOws,
+                });
             } else {
                 const invertedUserPairKey = `${paidById}->${owsId}`;
                 if (balancePerUserPair.has(invertedUserPairKey)) {
                     const current = balancePerUserPair.get(invertedUserPairKey)!;
                     current.amount -= stillOws;
-                    current.settlesPaymentsRequests.push({ paymentRequestId: paymentPerUser.paymentRequest.id, amount: -stillOws });
+                    current.settlesPaymentsRequests.push({
+                        paymentRequestId: paymentPerUser.paymentRequest.id,
+                        userId: paymentPerUser.user.id,
+                        amount: stillOws,
+                    });
                 } else {
                     balancePerUserPair.set(userPairKey, {
                         amount: stillOws,
                         ows: paymentPerUser.user as User,
                         paidBy: paymentPerUser.paymentRequest.paidBy as User,
-                        settlesPaymentsRequests: [{ paymentRequestId: paymentPerUser.paymentRequest.id, amount: stillOws }],
+                        settlesPaymentsRequests: [
+                            { paymentRequestId: paymentPerUser.paymentRequest.id, userId: paymentPerUser.user.id, amount: stillOws },
+                        ],
                     });
                 }
             }
@@ -122,20 +132,20 @@ export async function calculateOwingUsers() {
     return Array.from(balancePerUserPair.values());
 }
 
-export type JwtPayload = {
-    method: "iban";
-    paidBy: Partial<User>;
-    user: Partial<User>;
-    amount: number;
-    // settlesPaymentsRequests
-    paid: [paymentRequestId: string, amount: number][];
-};
+// export type JwtPayload = {
+//     method: "iban";
+//     paidBy: Partial<User>;
+//     user: Partial<User>;
+//     amount: number;
+//     // settlesPaymentsRequests
+//     paid: [paymentRequestId: string, amount: number][];
+// };
 
 export async function generatePaymentLink(
     ows: User,
     paidBy: User,
     amount: number,
-    paidPaymentsRequests: { paymentRequestId: string; amount: number }[]
+    paidPaymentsRequests: { paymentRequestId: string; amount: number; userId: number }[]
 ) {
     // const jwtPayload: JwtPayload = {
     //     method: "iban",

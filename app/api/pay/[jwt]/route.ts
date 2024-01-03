@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
-import { JwtPayload } from "@/notifications";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -33,17 +32,21 @@ export async function GET(request: NextRequest, { params }: { params: { jwt: str
 
     if (!link.paid) {
         await prisma.$transaction(async (prisma) => {
-            for (const { paymentRequestId, amount } of link.amountPerPaymentRequest as { paymentRequestId: string; amount: number }[]) {
+            for (const { paymentRequestId, amount, userId } of link.amountPerPaymentRequest as {
+                paymentRequestId: string;
+                amount: number;
+                userId: number;
+            }[]) {
                 await prisma.paymentRequestToUser.update({
                     where: {
                         userId_paymentRequestId: {
-                            userId: amount >= 0 ? link.sendingUserId : link.receivingUserId,
+                            userId: userId, // amount >= 0 ? link.sendingUserId : link.receivingUserId,
                             paymentRequestId: paymentRequestId!,
                         },
                     },
                     data: {
                         payedAmount: {
-                            increment: Math.abs(amount),
+                            increment: amount,
                         },
                         lastPaymentDate: new Date(),
                     },
