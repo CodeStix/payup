@@ -1,8 +1,25 @@
 "use client";
 
 import useSWR from "swr";
-import { Button, Text, Center, Heading, Skeleton, Flex, Card, CardBody, CardFooter, CardHeader, Divider, Box } from "@chakra-ui/react";
-import type { PaymentRequest } from "@prisma/client";
+import {
+    Button,
+    Text,
+    Center,
+    Heading,
+    Skeleton,
+    Flex,
+    Card,
+    CardBody,
+    CardFooter,
+    CardHeader,
+    Divider,
+    Box,
+    AvatarGroup,
+    Avatar,
+    Spacer,
+    AvatarBadge,
+} from "@chakra-ui/react";
+import type { PaymentRequest, User } from "@prisma/client";
 import { faArrowRight, faPlus } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { signIn, signOut, useSession } from "next-auth/react";
@@ -10,12 +27,24 @@ import { fetcher } from "@/util";
 import { useRouter } from "next/navigation";
 import { LogOutButton } from "@/components/LogOutButton";
 import { AppHeader } from "@/components/AppHeader";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+function getUserPayed(request: PaymentRequest & { usersToPay: { user: User; payedAmount: number; partsOfAmount: number }[] }, userId: number) {
+    let totalParts = 0;
+    request.usersToPay.forEach((e) => (totalParts += e.partsOfAmount));
+
+    let user = request.usersToPay.find((e) => e.user.id === userId);
+    if (!user) return false;
+
+    return user.payedAmount >= (user.partsOfAmount / totalParts) * request.amount;
+}
 
 export default function HomePage() {
     const router = useRouter();
     const { status: status } = useSession();
-    const { data, isLoading } = useSWR<{ requests: PaymentRequest[] }>("/api/request", fetcher);
+    const { data, isLoading } = useSWR<{
+        requests: (PaymentRequest & { usersToPay: { user: User; payedAmount: number; partsOfAmount: number }[] })[];
+    }>("/api/request", fetcher);
     const [loading, setLoading] = useState(false);
 
     async function createNew() {
@@ -36,6 +65,12 @@ export default function HomePage() {
             throw ex;
         }
     }
+
+    useEffect(() => {
+        if (status === "unauthenticated") {
+            router.replace("/");
+        }
+    }, [status]);
 
     return (
         <Flex style={{ height: "100%", justifyContent: "center" }}>
@@ -58,19 +93,32 @@ export default function HomePage() {
 
                         {data?.requests?.map((e) => (
                             <Card
+                                // colorScheme="green"
+                                background="#eee"
+                                shadow="none"
                                 _hover={{ transform: "translate(0, -5px)" }}
                                 style={{ transition: "100ms" }}
                                 cursor="pointer"
                                 onClick={() => router.push(`/request/${e.id}`)}>
-                                <CardHeader>
+                                <CardHeader display="flex" alignItems="center">
                                     <Heading size="md">{e.name}</Heading>
+                                    <Spacer />
+                                    <Text fontSize="x-large">€{e.amount.toFixed(2)}</Text>
                                 </CardHeader>
-                                <CardBody>
-                                    <Text>{e.description}</Text>
+                                <CardBody pt={0}>
+                                    <AvatarGroup size="md" max={8}>
+                                        {[...e.usersToPay]
+                                            .sort((a, b) => a.payedAmount - b.partsOfAmount)
+                                            .map((u) => (
+                                                <Avatar key={u.user.id} name={u.user.userName || u.user.email} src={u.user.avatarUrl || undefined}>
+                                                    <AvatarBadge boxSize="1.25em" bg={getUserPayed(e, u.user.id) ? "green.500" : "red.500"} />
+                                                </Avatar>
+                                            ))}
+                                    </AvatarGroup>
                                 </CardBody>
                                 {/* <CardFooter>
-                                <Button>{e.createdDate}</Button>
-                            </CardFooter> */}
+                                    <Button colorScheme="blue">Edit</Button>
+                                </CardFooter> */}
                             </Card>
                         ))}
                     </Flex>

@@ -8,7 +8,7 @@ const prisma = new PrismaClient();
 export async function GET(request: NextRequest): Promise<NextResponse> {
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
-        return NextResponse.json({}, { status: 401 });
+        return NextResponse.json(undefined, { status: 401 });
     }
 
     const query = request.nextUrl.searchParams.get("query");
@@ -62,6 +62,20 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             email: "asc",
         },
     });
+
+    if (!query) {
+        users.unshift(
+            await prisma.user.findUniqueOrThrow({
+                where: { email: session.user.email },
+                select: {
+                    email: true,
+                    avatarUrl: true,
+                    id: true,
+                    userName: true,
+                },
+            })
+        );
+    }
 
     return NextResponse.json(users);
 }

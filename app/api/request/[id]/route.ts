@@ -8,7 +8,7 @@ const prisma = new PrismaClient();
 export async function GET(request: NextRequest, { params }: { params: { id: string } }): Promise<NextResponse> {
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
-        return NextResponse.json({}, { status: 401 });
+        return NextResponse.json(undefined, { status: 401 });
     }
 
     const paymentRequest = await prisma.paymentRequest.findUnique({

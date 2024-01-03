@@ -54,8 +54,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             description: true,
             id: true,
             createdDate: true,
+            amount: true,
             usersToPay: {
                 select: {
+                    payedAmount: true,
+                    partsOfAmount: true,
                     user: {
                         select: {
                             id: true,

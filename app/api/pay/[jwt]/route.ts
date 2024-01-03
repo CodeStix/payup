@@ -37,13 +37,13 @@ export async function GET(request: NextRequest, { params }: { params: { jwt: str
                 await prisma.paymentRequestToUser.update({
                     where: {
                         userId_paymentRequestId: {
-                            userId: link.receivingUserId,
+                            userId: amount >= 0 ? link.sendingUserId : link.receivingUserId,
                             paymentRequestId: paymentRequestId!,
                         },
                     },
                     data: {
                         payedAmount: {
-                            increment: amount,
+                            increment: Math.abs(amount),
                         },
                         lastPaymentDate: new Date(),
                     },

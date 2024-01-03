@@ -70,9 +70,10 @@ export async function calculateOwingUsers() {
         const paidById = paymentPerUser.paymentRequest.paidBy.id;
         const owsId = paymentPerUser.user.id;
 
-        const stillOws = (paymentPerUser.partsOfAmount / partsInRequest) * paymentPerUser.paymentRequest.amount - paymentPerUser.payedAmount;
+        const shouldPayAmount = (paymentPerUser.partsOfAmount / partsInRequest) * paymentPerUser.paymentRequest.amount;
+        const stillOws = shouldPayAmount - paymentPerUser.payedAmount;
 
-        const settled = Math.abs(stillOws) < 0.01;
+        const settled = paidById === owsId || Math.abs(stillOws) < 0.01;
         if (settled) {
             console.log("Settled", owsId, "->", paidById);
 
@@ -85,6 +86,7 @@ export async function calculateOwingUsers() {
                 },
                 data: {
                     paymentComplete: true,
+                    payedAmount: shouldPayAmount,
                 },
             });
         } else {
@@ -175,22 +177,22 @@ export async function notifyUsers() {
     const emailTemplateString = await fs.readFile(EMAIL_TEMPLATE_PATH, { encoding: "utf-8" });
 
     for (let userPair of owingUserPairs) {
-        const amount = userPair.amount;
+        const amount = Math.abs(userPair.amount);
         const ows = userPair.amount >= 0 ? userPair.ows : userPair.paidBy;
         const paidBy = userPair.amount >= 0 ? userPair.paidBy : userPair.ows;
 
         const paymentLink = await generatePaymentLink(ows, paidBy, amount, userPair.settlesPaymentsRequests);
 
-        console.log(ows.userName, "ows", paidBy.userName, amount, paymentLink);
+        console.log(ows.email, "ows", paidBy.email, amount, paymentLink);
 
         await sendMail(
             ows.email,
             `You still owe ${paidBy.userName} money, pay up!`,
             getEmailHtml(emailTemplateString, {
                 paymentLink,
-                userName: ows.userName!,
-                paidByUserName: paidBy.userName!,
-                paidByEmail: paidBy.email!,
+                userName: ows.userName || ows.email,
+                paidByUserName: paidBy.userName || paidBy.email,
+                paidByEmail: paidBy.email,
             })
         );
     }

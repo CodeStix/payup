@@ -67,7 +67,7 @@ import useSWR from "swr";
 
 export default function PaymentRequestDetailPage({ params }: { params: { id: string } }) {
     const router = useRouter();
-    const { status: status } = useSession();
+    const { status, data: sessionData } = useSession();
     const [userQuery, setUserQuery] = useState("");
     const [activeUserQuery, setActiveUserQuery] = useState("");
     const [amount, setAmount] = useState<string>("");
@@ -209,6 +209,12 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
         }
     }
 
+    useEffect(() => {
+        if (status === "unauthenticated") {
+            router.replace("/");
+        }
+    }, [status]);
+
     return (
         <Flex style={{ height: "100%", justifyContent: "center" }}>
             <Flex style={{ flexDirection: "column", gap: "1rem", padding: "1rem", width: "400px" }}>
@@ -332,7 +338,12 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                             <ListItem my={1} display="flex" key={u.id} alignItems="center" gap={2}>
                                 <Avatar size="sm" name={u.userName || u.email} src={u.avatarUrl || undefined} />
                                 <Text wordBreak="break-word" fontWeight="normal">
-                                    {u.userName || removeEmailDomain(u.email)}
+                                    {u.userName || removeEmailDomain(u.email)}{" "}
+                                    {u.email === sessionData?.user?.email && (
+                                        <Text as="span" opacity={0.5}>
+                                            (you)
+                                        </Text>
+                                    )}
                                 </Text>
                                 <Spacer />
                                 <IconButton
