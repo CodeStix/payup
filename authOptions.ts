@@ -26,7 +26,7 @@ export const authOptions: AuthOptions = {
                 return false;
             }
 
-            await prisma.user.upsert({
+            const newUser = await prisma.user.upsert({
                 where: {
                     email: user.email,
                 },
@@ -40,6 +40,13 @@ export const authOptions: AuthOptions = {
                     userName: user.name,
                     avatarUrl: user.image,
                     lastLoginDate: new Date(),
+                },
+            });
+
+            await prisma.userToUser.create({
+                data: {
+                    requesterId: newUser.id,
+                    responderId: newUser.id,
                 },
             });
 

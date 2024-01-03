@@ -27,7 +27,9 @@ export default function Home() {
                 </Button>
             </Skeleton>
             <Skeleton isLoaded={status === "unauthenticated"}>
-                <Text style={{ opacity: "0.5" }}>You&apos;ll need to log in using Google to create a payment request.</Text>
+                <Text textAlign="center" style={{ opacity: "0.5" }}>
+                    You&apos;ll need to log in using Google to create a payment request.
+                </Text>
             </Skeleton>
         </Center>
     );

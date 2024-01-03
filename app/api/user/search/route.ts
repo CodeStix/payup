@@ -63,19 +63,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         },
     });
 
-    if (!query) {
-        users.unshift(
-            await prisma.user.findUniqueOrThrow({
-                where: { email: session.user.email },
-                select: {
-                    email: true,
-                    avatarUrl: true,
-                    id: true,
-                    userName: true,
-                },
-            })
-        );
-    }
+    // if (!query) {
+    //     users.unshift(
+    //         await prisma.user.findUniqueOrThrow({
+    //             where: { email: session.user.email },
+    //             select: {
+    //                 email: true,
+    //                 avatarUrl: true,
+    //                 id: true,
+    //                 userName: true,
+    //             },
+    //         })
+    //     );
+    // }
 
     return NextResponse.json(users);
 }
