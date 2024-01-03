@@ -132,8 +132,8 @@ export default function HomePage() {
                     </Flex>
                 </Skeleton>
 
-                <Box mt={"auto"}></Box>
-                <LogOutButton />
+                {/* <Box mt={"auto"}></Box>
+                <LogOutButton /> */}
             </Flex>
         </Flex>
     );

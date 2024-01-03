@@ -22,7 +22,7 @@ export function AppHeader(props: { backButton?: boolean }) {
                 Pay Up!
             </Heading>
             <Flex alignItems="center" justifyContent="end">
-                {/* <LogOutButton small /> */}
+                <LogOutButton small />
             </Flex>
         </Grid>
     );

@@ -23,9 +23,10 @@ export function LogOutButton(props: { small?: boolean }) {
         <IconButton
             icon={<FontAwesomeIcon icon={faSignOut} />}
             aria-label="sign out"
-            variant="solid"
+            variant="outline"
             isDisabled={loading}
             colorScheme="red"
+            // size="sm"
             onClick={logOut}
         />
     ) : (

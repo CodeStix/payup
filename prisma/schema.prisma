@@ -34,18 +34,18 @@ model User {
 }
 
 model UserToUser {
-  requester   User @relation(fields: [requesterId], references: [id], name: "requesters")
+  requester   User @relation(fields: [requesterId], references: [id], name: "requesters", onDelete: Cascade)
   requesterId Int
-  responder   User @relation(fields: [responderId], references: [id], name: "responders")
+  responder   User @relation(fields: [responderId], references: [id], name: "responders", onDelete: Cascade)
   responderId Int
 
   @@id([requesterId, responderId])
 }
 
 model PaymentRequestToUser {
-  user             User           @relation(fields: [userId], references: [id])
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId           Int
-  paymentRequest   PaymentRequest @relation(fields: [paymentRequestId], references: [id])
+  paymentRequest   PaymentRequest @relation(fields: [paymentRequestId], references: [id], onDelete: Cascade)
   paymentRequestId String
 
   partsOfAmount Int @default(1)
@@ -67,7 +67,7 @@ model PaymentRequest {
   createdDate DateTime @default(now())
   amount      Float    @default(0)
 
-  paidBy     User                   @relation(fields: [paidById], references: [id], name: "paid")
+  paidBy     User                   @relation(fields: [paidById], references: [id], name: "paid", onDelete: Cascade)
   paidById   Int
   usersToPay PaymentRequestToUser[]
 
@@ -81,9 +81,9 @@ model PaymentLink {
   paidDate                DateTime?
   amount                  Float
   amountPerPaymentRequest Json
-  receivingUser           User      @relation(fields: [receivingUserId], references: [id], name: "receivingLinkUser")
+  receivingUser           User      @relation(fields: [receivingUserId], references: [id], name: "receivingLinkUser", onDelete: Cascade)
   receivingUserId         Int
-  sendingUser             User      @relation(fields: [sendingUserId], references: [id], name: "sendingLinkUser")
+  sendingUser             User      @relation(fields: [sendingUserId], references: [id], name: "sendingLinkUser", onDelete: Cascade)
   sendingUserId           Int
 
   paymentMethod   String  @default("iban")
