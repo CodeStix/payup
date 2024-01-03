@@ -32,6 +32,7 @@ export async function calculateOwingUsers() {
                     email: true,
                     userName: true,
                     iban: true,
+                    mollieApiKey: true,
                 },
             },
             partsOfAmount: true,
@@ -40,11 +41,14 @@ export async function calculateOwingUsers() {
             paymentRequest: {
                 select: {
                     id: true,
+                    name: true,
                     paidBy: {
                         select: {
                             id: true,
                             userName: true,
                             email: true,
+                            iban: true,
+                            mollieApiKey: true,
                         },
                     },
                     amount: true,
@@ -62,7 +66,12 @@ export async function calculateOwingUsers() {
 
     const balancePerUserPair = new Map<
         string,
-        { ows: User; paidBy: User; amount: number; settlesPaymentsRequests: { paymentRequestId: string; userId: number; amount: number }[] }
+        {
+            ows: User;
+            paidBy: User;
+            amount: number;
+            settlesPaymentsRequests: { paymentRequestId: string; userId: number; amount: number; name: string }[];
+        }
     >();
 
     for (const paymentPerUser of payingUserOpenRequests) {
@@ -100,6 +109,7 @@ export async function calculateOwingUsers() {
                     paymentRequestId: paymentPerUser.paymentRequest.id,
                     userId: paymentPerUser.user.id,
                     amount: stillOws,
+                    name: paymentPerUser.paymentRequest.name,
                 });
             } else {
                 const invertedUserPairKey = `${paidById}->${owsId}`;
@@ -110,6 +120,7 @@ export async function calculateOwingUsers() {
                         paymentRequestId: paymentPerUser.paymentRequest.id,
                         userId: paymentPerUser.user.id,
                         amount: stillOws,
+                        name: paymentPerUser.paymentRequest.name,
                     });
                 } else {
                     balancePerUserPair.set(userPairKey, {
@@ -117,7 +128,12 @@ export async function calculateOwingUsers() {
                         ows: paymentPerUser.user as User,
                         paidBy: paymentPerUser.paymentRequest.paidBy as User,
                         settlesPaymentsRequests: [
-                            { paymentRequestId: paymentPerUser.paymentRequest.id, userId: paymentPerUser.user.id, amount: stillOws },
+                            {
+                                paymentRequestId: paymentPerUser.paymentRequest.id,
+                                userId: paymentPerUser.user.id,
+                                amount: stillOws,
+                                name: paymentPerUser.paymentRequest.name,
+                            },
                         ],
                     });
                 }
@@ -165,6 +181,7 @@ export async function generatePaymentLink(
             sendingUserId: paidBy.id,
             receivingUserId: ows.id,
             amountPerPaymentRequest: paidPaymentsRequests,
+            paymentMethod: paidBy.mollieApiKey ? "mollie" : "iban",
             paid: false,
         },
     });
@@ -203,6 +220,7 @@ export async function notifyUsers() {
                 userName: ows.userName || ows.email,
                 paidByUserName: paidBy.userName || paidBy.email,
                 paidByEmail: paidBy.email,
+                description: userPair.settlesPaymentsRequests.map((e) => e.name).join(", "),
             })
         );
     }

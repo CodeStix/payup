@@ -1,10 +1,100 @@
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
-import { PrismaClient } from "@prisma/client";
+import { PaymentLink, PrismaClient, User } from "@prisma/client";
+import { getClientForUser } from "@/mollie";
+import { PaymentStatus } from "@mollie/api-client";
 
 const prisma = new PrismaClient();
 
+async function completeLinkPayment(link: PaymentLink): Promise<PaymentLink> {
+    return await prisma.$transaction(async (prisma) => {
+        for (const { paymentRequestId, amount, userId } of link.amountPerPaymentRequest as {
+            paymentRequestId: string;
+            amount: number;
+            userId: number;
+        }[]) {
+            await prisma.paymentRequestToUser.update({
+                where: {
+                    userId_paymentRequestId: {
+                        userId: userId,
+                        paymentRequestId: paymentRequestId!,
+                    },
+                },
+                data: {
+                    payedAmount: {
+                        increment: amount,
+                    },
+                    lastPaymentDate: new Date(),
+                },
+            });
+        }
+
+        return await prisma.paymentLink.update({
+            where: {
+                id: link.id,
+            },
+            data: {
+                paid: true,
+                paidDate: new Date(),
+            },
+        });
+    });
+}
+
+export type PayResponse = /*Partial<PaymentLink> & { receivingUser: User; sendingUser: User } &*/ {
+    paymentMethod: string;
+    paid: boolean;
+    paidDate?: Date | null;
+    status?: string;
+    checkoutUrl?: string;
+};
+
 export async function GET(request: NextRequest, { params }: { params: { jwt: string } }): Promise<NextResponse> {
+    let link = await prisma.paymentLink.findUnique({
+        where: {
+            id: params.jwt,
+        },
+        select: {
+            amount: true,
+            id: true,
+            paid: true,
+            paidDate: true,
+            paymentMethod: true,
+            molliePaymentId: true,
+            receivingUser: {
+                select: {
+                    email: true,
+                    id: true,
+                    userName: true,
+                    avatarUrl: true,
+                },
+            },
+            sendingUser: {
+                select: {
+                    iban: true,
+                    email: true,
+                    id: true,
+                    userName: true,
+                    avatarUrl: true,
+                },
+            },
+        },
+    });
+
+    if (!link) {
+        return NextResponse.json(undefined, { status: 404 });
+    }
+
+    let mollieClient;
+    if (link.paymentMethod === "mollie" && link.molliePaymentId && (mollieClient = getClientForUser(link.sendingUser))) {
+        const payment = await mollieClient.payments.get(link.molliePaymentId);
+        return NextResponse.json({ ...link, molliePaymentId: undefined, status: payment.status, checkoutUrl: payment.getCheckoutUrl() });
+    }
+
+    return NextResponse.json(link);
+}
+
+export async function POST(request: NextRequest, { params }: { params: { jwt: string } }): Promise<NextResponse> {
     // let jwtPayLoad: JwtPayload;
     // try {
     //     const jwtString = decodeURIComponent(params.jwt);
@@ -16,7 +106,7 @@ export async function GET(request: NextRequest, { params }: { params: { jwt: str
 
     // console.log("jwt", jwtPayLoad);
 
-    const link = await prisma.paymentLink.findUnique({
+    let link = await prisma.paymentLink.findUnique({
         where: {
             id: params.jwt,
         },
@@ -27,43 +117,81 @@ export async function GET(request: NextRequest, { params }: { params: { jwt: str
     });
 
     if (!link) {
-        return NextResponse.json({}, { status: 404 });
+        return NextResponse.json(undefined, { status: 404 });
     }
 
-    if (!link.paid) {
-        await prisma.$transaction(async (prisma) => {
-            for (const { paymentRequestId, amount, userId } of link.amountPerPaymentRequest as {
-                paymentRequestId: string;
-                amount: number;
-                userId: number;
-            }[]) {
-                await prisma.paymentRequestToUser.update({
-                    where: {
-                        userId_paymentRequestId: {
-                            userId: userId, // amount >= 0 ? link.sendingUserId : link.receivingUserId,
-                            paymentRequestId: paymentRequestId!,
-                        },
-                    },
-                    data: {
-                        payedAmount: {
-                            increment: amount,
-                        },
-                        lastPaymentDate: new Date(),
-                    },
-                });
+    const response: PayResponse = {
+        // id: link.id,
+        paid: link.paid,
+        paidDate: link.paidDate,
+        paymentMethod: link.paymentMethod,
+    };
+
+    if (link.paid) {
+        return NextResponse.json(response);
+    }
+
+    if (link.paymentMethod === "mollie") {
+        if (link.molliePaymentId) {
+            // Check if active mollie payment is completed
+            const mollieClient = getClientForUser(link.sendingUser);
+            if (!mollieClient) {
+                console.error("Could not get mollie client for", link.sendingUser);
+                return NextResponse.json(undefined, { status: 500 });
             }
+
+            const payment = await mollieClient.payments.get(link.molliePaymentId);
+            response.status = payment.status;
+            response.checkoutUrl = payment.getCheckoutUrl()!;
+
+            if (payment.status === PaymentStatus.paid) {
+                link = { ...link, ...(await completeLinkPayment(link)) };
+            }
+        } else if (typeof link.sendingUser.mollieApiKey === "string") {
+            // Use mollie because user has registered api key for it
+            const mollieClient = getClientForUser(link.sendingUser);
+            if (!mollieClient) {
+                console.error("Could not get mollie client for", link.sendingUser);
+                return NextResponse.json(undefined, { status: 500 });
+            }
+
+            const payment = await mollieClient.payments.create({
+                amount: {
+                    currency: "EUR",
+                    value: link.amount.toFixed(2),
+                },
+                description: "No description yet",
+                redirectUrl: `${process.env.SERVER_URL}/pay/${link.id}`,
+            });
 
             await prisma.paymentLink.update({
                 where: {
                     id: link.id,
                 },
                 data: {
-                    paid: true,
-                    paidDate: new Date(),
+                    molliePaymentId: payment.id,
+                },
+                include: {
+                    receivingUser: true,
+                    sendingUser: true,
                 },
             });
-        });
+
+            response.status = payment.status;
+            response.checkoutUrl = payment.getCheckoutUrl()!;
+        } else {
+            console.error("User doesn't have mollie anymore", link.sendingUser);
+            return NextResponse.json(undefined, { status: 400 });
+        }
+    } else {
+        // Pay automatically, we expect the user to pay manually using iban
+        link = { ...link, ...(await completeLinkPayment(link)) };
     }
+
+    response.paid = link.paid;
+    response.paidDate = link.paidDate;
+
+    return NextResponse.json(response);
 
     /*await prisma.$transaction(async (prisma) => {
         let paidAmount = jwtPayLoad.amount;
@@ -182,13 +310,4 @@ export async function GET(request: NextRequest, { params }: { params: { jwt: str
             }
         }
     });*/
-
-    return NextResponse.json({
-        paidBy: link.sendingUser,
-        user: link.receivingUser,
-        paid: link.paid,
-        paidDate: link.paidDate?.getTime(),
-        amount: link.amount,
-        method: "iban",
-    });
 }

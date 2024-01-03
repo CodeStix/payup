@@ -165,13 +165,15 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         const toDelete = new Set(newRequest.usersToPay.map((e) => e.userId));
         body.usersToPay.forEach((e) => toDelete.delete(e.user.id));
 
-        await prisma.paymentRequestToUser.deleteMany({
-            where: {
-                userId: {
-                    in: Array.from(toDelete),
+        if (toDelete.size > 0) {
+            await prisma.paymentRequestToUser.deleteMany({
+                where: {
+                    userId: {
+                        in: Array.from(toDelete),
+                    },
                 },
-            },
-        });
+            });
+        }
     }
 
     return NextResponse.json({ request: newRequest });

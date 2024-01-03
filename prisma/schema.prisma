@@ -18,6 +18,7 @@ model User {
   lastLoginDate DateTime @default(now())
   avatarUrl     String?
   iban          String?
+  mollieApiKey  String?
 
   paymentRequests PaymentRequest[]       @relation("owner")
   requestedToPay  PaymentRequestToUser[]
@@ -84,6 +85,9 @@ model PaymentLink {
   receivingUserId         Int
   sendingUser             User      @relation(fields: [sendingUserId], references: [id], name: "sendingLinkUser")
   sendingUserId           Int
+
+  paymentMethod   String  @default("iban")
+  molliePaymentId String?
 
   createdDate DateTime @default(now())
 }
