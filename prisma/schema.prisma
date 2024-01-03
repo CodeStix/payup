@@ -17,6 +17,7 @@ model User {
   registerDate  DateTime @default(now())
   lastLoginDate DateTime @default(now())
   avatarUrl     String?
+  iban          String?
 
   paymentRequests PaymentRequest[]       @relation("owner")
   requestedToPay  PaymentRequestToUser[]
@@ -26,6 +27,9 @@ model User {
   requesters UserToUser[] @relation("requesters")
   // This user is related to because they initiated a connected to this user
   responders UserToUser[] @relation("responders")
+
+  receivedLinks PaymentLink[] @relation("receivingLinkUser")
+  sentLinks     PaymentLink[] @relation("sendingLinkUser")
 }
 
 model UserToUser {
@@ -50,6 +54,7 @@ model PaymentRequestToUser {
   paymentComplete      Boolean   @default(false)
   lastNotificationDate DateTime?
   payedAmount          Float     @default(0)
+  lastPaymentDate      DateTime?
 
   @@id([userId, paymentRequestId])
 }
@@ -67,4 +72,18 @@ model PaymentRequest {
 
   owner   User @relation(fields: [ownerId], references: [id], name: "owner")
   ownerId Int
+}
+
+model PaymentLink {
+  id                      String    @id @default(uuid())
+  paid                    Boolean
+  paidDate                DateTime?
+  amount                  Float
+  amountPerPaymentRequest Json
+  receivingUser           User      @relation(fields: [receivingUserId], references: [id], name: "receivingLinkUser")
+  receivingUserId         Int
+  sendingUser             User      @relation(fields: [sendingUserId], references: [id], name: "sendingLinkUser")
+  sendingUserId           Int
+
+  createdDate DateTime @default(now())
 }

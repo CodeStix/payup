@@ -44,8 +44,11 @@ import {
     PopoverTrigger,
 } from "@chakra-ui/react";
 import {
+    faCheck,
+    faCheckDouble,
     faChevronLeft,
     faCoins,
+    faHourglass,
     faMoneyBill,
     faMoneyBill1Wave,
     faPlus,
@@ -53,6 +56,7 @@ import {
     faSearch,
     faSubtract,
     faTimes,
+    faWarning,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { PaymentRequest, User } from "@prisma/client";
@@ -360,6 +364,7 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                                 </Text>
                                 <Spacer />
 
+                                <PaymentStatusButton userToPay={e as any} request={request} totalParts={totalParts} />
                                 <Popover>
                                     <PopoverTrigger>
                                         <Button variant="link" color="green.500" mx={1} fontWeight="semibold" whiteSpace="nowrap">
@@ -418,5 +423,43 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                 <LogOutButton />
             </Flex>
         </Flex>
+    );
+}
+
+function PaymentStatusButton(props: {
+    userToPay: { partsOfAmount: number; payedAmount: number; lastPaymentDate: number };
+    totalParts: number;
+    request: PaymentRequest;
+}) {
+    const shouldPay = (props.userToPay.partsOfAmount / props.totalParts) * props.request.amount;
+    const paid = Math.abs(shouldPay - props.userToPay.payedAmount) < 0.01;
+    const paidLess = props.userToPay.payedAmount > 0 && props.userToPay.payedAmount < shouldPay;
+    const paidTooMuch = props.userToPay.payedAmount > shouldPay;
+
+    return (
+        <Popover>
+            <PopoverTrigger>
+                <IconButton
+                    colorScheme={paidLess ? "yellow" : paid || paidTooMuch ? "green" : "blue"}
+                    size="xs"
+                    rounded={"full"}
+                    variant="solid"
+                    aria-label="Payment status"
+                    icon={<FontAwesomeIcon icon={paidLess ? faWarning : paidTooMuch ? faCheckDouble : paid ? faCheck : faHourglass} />}
+                />
+            </PopoverTrigger>
+            <PopoverContent>
+                <PopoverArrow />
+                <PopoverCloseButton />
+                <PopoverHeader>
+                    Payment status:{" "}
+                    {paidLess ? <>Didn't pay enough</> : paidTooMuch ? <>Paid too much</> : paid ? <>Paid</> : <>Waiting for payment</>}
+                </PopoverHeader>
+                <PopoverBody>
+                    €{props.userToPay.payedAmount.toFixed(2)} / €{shouldPay.toFixed(2)} paid.{" "}
+                    {props.userToPay.lastPaymentDate && <>Last payment at {new Date(props.userToPay.lastPaymentDate).toLocaleString()}</>}
+                </PopoverBody>
+            </PopoverContent>
+        </Popover>
     );
 }

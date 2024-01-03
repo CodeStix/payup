@@ -1,9 +1,14 @@
 import { PrismaClient, User } from "@prisma/client";
-import AWS, { SES } from "aws-sdk";
+import AWS from "aws-sdk";
+import jwt from "jsonwebtoken";
+import fs from "fs/promises";
+import { htmlToText } from "html-to-text";
 
 const prisma = new PrismaClient();
 
-const { AWS_REGION, AWS_SES_KEY, AWS_SES_SECRET, AWS_SES_SOURCE } = process.env;
+const EMAIL_TEMPLATE_PATH = "email/template.html";
+
+const { AWS_REGION, AWS_SES_KEY, AWS_SES_SECRET, AWS_SES_SOURCE, JWT_SECRET, SERVER_URL } = process.env;
 
 AWS.config.update({
     region: AWS_REGION,
@@ -25,6 +30,8 @@ export async function calculateOwingUsers() {
                 select: {
                     id: true,
                     email: true,
+                    userName: true,
+                    iban: true,
                 },
             },
             partsOfAmount: true,
@@ -36,6 +43,7 @@ export async function calculateOwingUsers() {
                     paidBy: {
                         select: {
                             id: true,
+                            userName: true,
                             email: true,
                         },
                     },
@@ -52,7 +60,10 @@ export async function calculateOwingUsers() {
         partsPerRequest.set(paymentRequestId, (partsPerRequest.get(paymentRequestId) ?? 0) + paymentPerUser.partsOfAmount);
     }
 
-    const balancePerUserPair = new Map<string, { ows: User; paidBy: User; amount: number }>();
+    const balancePerUserPair = new Map<
+        string,
+        { ows: User; paidBy: User; amount: number; settlesPaymentsRequests: { paymentRequestId: string; amount: number }[] }
+    >();
 
     for (const paymentPerUser of payingUserOpenRequests) {
         const partsInRequest = partsPerRequest.get(paymentPerUser.paymentRequest.id)!;
@@ -64,6 +75,7 @@ export async function calculateOwingUsers() {
         const settled = Math.abs(stillOws) < 0.01;
         if (settled) {
             console.log("Settled", owsId, "->", paidById);
+
             await prisma.paymentRequestToUser.update({
                 where: {
                     userId_paymentRequestId: {
@@ -76,44 +88,111 @@ export async function calculateOwingUsers() {
                 },
             });
         } else {
-            console.log("Should still pay", owsId, "->", paidById, "=", stillOws);
+            // console.log("Should still pay", owsId, "->", paidById, "=", stillOws);
 
             const userPairKey = `${owsId}->${paidById}`;
             if (balancePerUserPair.has(userPairKey)) {
                 const current = balancePerUserPair.get(userPairKey)!;
                 current.amount += stillOws;
+                current.settlesPaymentsRequests.push({ paymentRequestId: paymentPerUser.paymentRequest.id, amount: stillOws });
             } else {
                 const invertedUserPairKey = `${paidById}->${owsId}`;
                 if (balancePerUserPair.has(invertedUserPairKey)) {
                     const current = balancePerUserPair.get(invertedUserPairKey)!;
                     current.amount -= stillOws;
+                    current.settlesPaymentsRequests.push({ paymentRequestId: paymentPerUser.paymentRequest.id, amount: -stillOws });
                 } else {
                     balancePerUserPair.set(userPairKey, {
                         amount: stillOws,
                         ows: paymentPerUser.user as User,
                         paidBy: paymentPerUser.paymentRequest.paidBy as User,
+                        settlesPaymentsRequests: [{ paymentRequestId: paymentPerUser.paymentRequest.id, amount: stillOws }],
                     });
                 }
             }
         }
     }
 
-    for (const owing of Array.from(balancePerUserPair.values())) {
-        console.log(owing.ows.email, "ows", owing.paidBy.email, "amount", owing.amount);
-    }
+    // for (const owing of Array.from(balancePerUserPair.values())) {
+    //     console.log(owing.ows.email, "ows", owing.paidBy.email, "amount", owing.amount);
+    // }
 
     return Array.from(balancePerUserPair.values());
 }
 
-export async function notifyUsers() {
-    let owing = await calculateOwingUsers();
+export type JwtPayload = {
+    method: "iban";
+    paidBy: Partial<User>;
+    user: Partial<User>;
+    amount: number;
+    // settlesPaymentsRequests
+    paid: [paymentRequestId: string, amount: number][];
+};
 
-    for (let o of owing) {
-        if (o.amount >= 0) {
-            await sendMail(o.ows.email, `You still owe ${o.paidBy.userName} money, pay up!`, "");
-        } else {
-            await sendMail(o.paidBy.email, `You still owe ${o.ows.userName} money, pay up!`, "");
-        }
+export async function generatePaymentLink(
+    ows: User,
+    paidBy: User,
+    amount: number,
+    paidPaymentsRequests: { paymentRequestId: string; amount: number }[]
+) {
+    // const jwtPayload: JwtPayload = {
+    //     method: "iban",
+    //     paidBy: {
+    //         id: paidBy.id,
+    //     },
+    //     user: {
+    //         id: ows.id,
+    //     },
+    //     amount: amount,
+    //     paid: paidPaymentsRequests,
+    // };
+
+    const link = await prisma.paymentLink.create({
+        data: {
+            amount: amount,
+            sendingUserId: paidBy.id,
+            receivingUserId: ows.id,
+            amountPerPaymentRequest: paidPaymentsRequests,
+            paid: false,
+        },
+    });
+
+    // const jwtString = jwt.sign(jwtPayload, JWT_SECRET!, { expiresIn: 60 * 60 * 24 * 30 });
+    return `${SERVER_URL}/pay/${encodeURIComponent(link.id)}`;
+}
+
+export function getEmailHtml(template: string, fields: Record<string, string>) {
+    for (let field in fields) {
+        template = template.replaceAll(`%${field}%`, fields[field]);
+    }
+
+    return template;
+}
+
+export async function notifyUsers() {
+    const owingUserPairs = await calculateOwingUsers();
+
+    const emailTemplateString = await fs.readFile(EMAIL_TEMPLATE_PATH, { encoding: "utf-8" });
+
+    for (let userPair of owingUserPairs) {
+        const amount = userPair.amount;
+        const ows = userPair.amount >= 0 ? userPair.ows : userPair.paidBy;
+        const paidBy = userPair.amount >= 0 ? userPair.paidBy : userPair.ows;
+
+        const paymentLink = await generatePaymentLink(ows, paidBy, amount, userPair.settlesPaymentsRequests);
+
+        console.log(ows.userName, "ows", paidBy.userName, amount, paymentLink);
+
+        await sendMail(
+            ows.email,
+            `You still owe ${paidBy.userName} money, pay up!`,
+            getEmailHtml(emailTemplateString, {
+                paymentLink,
+                userName: ows.userName!,
+                paidByUserName: paidBy.userName!,
+                paidByEmail: paidBy.email!,
+            })
+        );
     }
 }
 
@@ -126,11 +205,11 @@ async function sendMail(receiver: string, subject: string, body: string) {
                 },
                 Message: {
                     Body: {
-                        // Html: {
-
-                        // },
-                        Text: {
+                        Html: {
                             Data: body,
+                        },
+                        Text: {
+                            Data: htmlToText(body),
                         },
                     },
                     Subject: {
@@ -143,5 +222,5 @@ async function sendMail(receiver: string, subject: string, body: string) {
             .then((e) => {
                 console.log("Sent mail to", receiver);
             });
-    else console.warn("Sent email to (skipped)", receiver);
+    else console.warn("Sent email to (skipped)", receiver, subject);
 }
