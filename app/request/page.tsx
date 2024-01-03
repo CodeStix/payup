@@ -20,7 +20,7 @@ import {
     AvatarBadge,
 } from "@chakra-ui/react";
 import type { PaymentRequest, User } from "@prisma/client";
-import { faArrowRight, faPlus } from "@fortawesome/free-solid-svg-icons";
+import { faArrowRight, faCheck, faPlus, faTimes } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { signIn, signOut, useSession } from "next-auth/react";
 import { fetcher } from "@/util";
@@ -86,7 +86,7 @@ export default function HomePage() {
                             isDisabled={loading}
                             onClick={createNew}
                             width="100%"
-                            colorScheme="orange"
+                            colorScheme="green"
                             leftIcon={<FontAwesomeIcon icon={faPlus} />}>
                             Create new payment request
                         </Button>
@@ -109,11 +109,19 @@ export default function HomePage() {
                                     <AvatarGroup size="md" max={8}>
                                         {[...e.usersToPay]
                                             .sort((a, b) => a.payedAmount - b.partsOfAmount)
-                                            .map((u) => (
-                                                <Avatar key={u.user.id} name={u.user.userName || u.user.email} src={u.user.avatarUrl || undefined}>
-                                                    <AvatarBadge boxSize="1.25em" bg={getUserPayed(e, u.user.id) ? "green.500" : "red.500"} />
-                                                </Avatar>
-                                            ))}
+                                            .map((u) => {
+                                                const payed = getUserPayed(e, u.user.id);
+                                                return (
+                                                    <Avatar
+                                                        key={u.user.id}
+                                                        name={u.user.userName || u.user.email}
+                                                        src={u.user.avatarUrl || undefined}>
+                                                        <AvatarBadge boxSize="1.25em" bg={payed ? "green.500" : "red.500"}>
+                                                            <FontAwesomeIcon color="white" size="2xs" icon={payed ? faCheck : faTimes} />
+                                                        </AvatarBadge>
+                                                    </Avatar>
+                                                );
+                                            })}
                                     </AvatarGroup>
                                 </CardBody>
                                 {/* <CardFooter>

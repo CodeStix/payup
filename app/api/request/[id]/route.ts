@@ -81,6 +81,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                 id: number;
             };
             partsOfAmount?: number;
+            payedAmount?: number;
         }[];
     };
 
@@ -108,11 +109,13 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                           update: {
                               partsOfAmount: u.partsOfAmount || 1,
                               paymentComplete: false, // Maybe it got updated, recheck it during next cron job
+                              payedAmount: u.payedAmount || undefined,
                           },
                           create: {
                               userId: u.user.id,
                               partsOfAmount: u.partsOfAmount || 1,
                               paymentComplete: false,
+                              payedAmount: 0,
                           },
                       })),
                   }
@@ -138,6 +141,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                         },
                     },
                 },
+                orderBy: [{ payedAmount: "asc" }, { userId: "asc" }],
             },
         },
     });

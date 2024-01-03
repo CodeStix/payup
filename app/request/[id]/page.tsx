@@ -42,9 +42,11 @@ import {
     PopoverContent,
     PopoverHeader,
     PopoverTrigger,
+    PopoverFooter,
 } from "@chakra-ui/react";
 import {
     faCheck,
+    faCheckCircle,
     faCheckDouble,
     faChevronLeft,
     faCoins,
@@ -114,7 +116,7 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
         };
     }, [userQuery]);
 
-    async function patch(n: Partial<PaymentRequest & { usersToPay: { user: { id: number }; partsOfAmount: number }[] }>) {
+    async function patch(n: Partial<PaymentRequest & { usersToPay: { user: { id: number }; partsOfAmount: number; payedAmount?: number }[] }>) {
         setUpdating(true);
         try {
             const res = await fetch(`/api/request/${params.id}`, {
@@ -167,7 +169,7 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
         }
     }
 
-    async function bindUser(user: User, partsOfAmount: number = 1) {
+    async function bindUser(user: User, partsOfAmount: number = 1, payedAmount?: number) {
         if (!request) {
             console.error("Cannot bindUser, not loaded");
             return;
@@ -175,7 +177,10 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
         setUpdating(true);
         try {
             await patch({
-                usersToPay: [...request.usersToPay.filter((e) => e.user.id !== user.id), { user: user, partsOfAmount: partsOfAmount }],
+                usersToPay: [
+                    ...request.usersToPay.filter((e) => e.user.id !== user.id),
+                    { user: user, partsOfAmount: partsOfAmount, payedAmount: payedAmount },
+                ],
             });
         } finally {
             setUpdating(false);
@@ -375,7 +380,16 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                                 </Text>
                                 <Spacer />
 
-                                <PaymentStatusButton userToPay={e as any} request={request} totalParts={totalParts} />
+                                <PaymentStatusButton
+                                    onMarkPaid={(a) => {
+                                        void bindUser(e.user, e.partsOfAmount, a);
+                                    }}
+                                    isDisabled={isUpdating}
+                                    userToPay={e as any}
+                                    request={request}
+                                    totalParts={totalParts}
+                                />
+
                                 <Popover>
                                     <PopoverTrigger>
                                         <Button variant="link" color="green.500" mx={1} fontWeight="semibold" whiteSpace="nowrap">
@@ -441,6 +455,8 @@ function PaymentStatusButton(props: {
     userToPay: { partsOfAmount: number; payedAmount: number; lastPaymentDate: number };
     totalParts: number;
     request: PaymentRequest;
+    isDisabled: boolean;
+    onMarkPaid: (payedAmount: number) => void;
 }) {
     const shouldPay = (props.userToPay.partsOfAmount / props.totalParts) * props.request.amount;
     const paid = Math.abs(shouldPay - props.userToPay.payedAmount) < 0.01;
@@ -451,25 +467,83 @@ function PaymentStatusButton(props: {
         <Popover>
             <PopoverTrigger>
                 <IconButton
-                    colorScheme={paidLess ? "yellow" : paid || paidTooMuch ? "green" : "blue"}
+                    colorScheme={paidLess ? "red" : paid || paidTooMuch ? "green" : "blue"}
                     size="xs"
                     rounded={"full"}
                     variant="solid"
                     aria-label="Payment status"
-                    icon={<FontAwesomeIcon icon={paidLess ? faWarning : paidTooMuch ? faCheckDouble : paid ? faCheck : faHourglass} />}
+                    icon={<FontAwesomeIcon icon={paidLess ? faWarning : paidTooMuch ? faWarning : paid ? faCheck : faHourglass} />}
                 />
             </PopoverTrigger>
-            <PopoverContent>
+            <PopoverContent pr={4} w="400px">
                 <PopoverArrow />
                 <PopoverCloseButton />
                 <PopoverHeader>
                     Payment status:{" "}
-                    {paidLess ? <>Didn't pay enough</> : paidTooMuch ? <>Paid too much</> : paid ? <>Paid</> : <>Waiting for payment</>}
+                    {paidLess ? (
+                        <Text as="span" fontWeight="semibold" color="red.500">
+                            <FontAwesomeIcon icon={faWarning} /> Didn't pay enough
+                        </Text>
+                    ) : paidTooMuch ? (
+                        <Text as="span" fontWeight="semibold" color="green.500">
+                            <FontAwesomeIcon icon={faWarning} /> Paid too much
+                        </Text>
+                    ) : paid ? (
+                        <Text as="span" fontWeight="semibold" color="green.500">
+                            <FontAwesomeIcon icon={faCheckCircle} /> Paid
+                        </Text>
+                    ) : (
+                        <Text as="span" fontWeight="semibold">
+                            Waiting for payment
+                        </Text>
+                    )}
                 </PopoverHeader>
-                <PopoverBody>
-                    €{props.userToPay.payedAmount.toFixed(2)} / €{shouldPay.toFixed(2)} paid.{" "}
-                    {props.userToPay.lastPaymentDate && <>Last payment at {new Date(props.userToPay.lastPaymentDate).toLocaleString()}</>}
+                <PopoverBody display="flex" gap={2} flexDir="column">
+                    {paidTooMuch && (
+                        <Text as="p" opacity={0.5}>
+                            But don't worry, you will be notified automatically when you should pay it back.
+                        </Text>
+                    )}
+                    {paidLess && (
+                        <Text as="p" opacity={0.5}>
+                            But don't worry, they will be notified automatically when they should pay you again.
+                        </Text>
+                    )}
+
+                    <Text as="p">
+                        <Text fontWeight="semibold" as="span">
+                            €{props.userToPay.payedAmount.toFixed(2)}
+                        </Text>{" "}
+                        /{" "}
+                        <Text fontWeight="semibold" as="span">
+                            €{shouldPay.toFixed(2)}
+                        </Text>{" "}
+                        paid.{" "}
+                    </Text>
+
+                    {(paidLess || !paid) && (
+                        <Button
+                            isDisabled={props.isDisabled}
+                            onClick={() => props.onMarkPaid(shouldPay)}
+                            colorScheme="green"
+                            size="sm"
+                            leftIcon={<FontAwesomeIcon icon={faCheckCircle} />}>
+                            Mark as fully paid
+                        </Button>
+                    )}
                 </PopoverBody>
+                <PopoverFooter>
+                    <Text as="p" opacity={0.5} fontSize="xs">
+                        {props.userToPay.lastPaymentDate && (
+                            <>
+                                Last payment at{" "}
+                                <Text fontWeight="normal" as="span">
+                                    {new Date(props.userToPay.lastPaymentDate).toLocaleString()}
+                                </Text>
+                            </>
+                        )}
+                    </Text>
+                </PopoverFooter>
             </PopoverContent>
         </Popover>
     );
