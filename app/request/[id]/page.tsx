@@ -460,8 +460,8 @@ function PaymentStatusButton(props: {
 }) {
     const shouldPay = (props.userToPay.partsOfAmount / props.totalParts) * props.request.amount;
     const paid = Math.abs(shouldPay - props.userToPay.payedAmount) < 0.01;
-    const paidLess = props.userToPay.payedAmount > 0 && props.userToPay.payedAmount < shouldPay;
-    const paidTooMuch = props.userToPay.payedAmount > shouldPay;
+    const paidLess = props.userToPay.payedAmount > 0 && props.userToPay.payedAmount - shouldPay < -0.01;
+    const paidTooMuch = props.userToPay.payedAmount - shouldPay > 0.01;
 
     return (
         <Popover>
