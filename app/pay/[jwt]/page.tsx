@@ -69,7 +69,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
         <Center style={{ height: "100%", flexDirection: "column", gap: "1em" }}>
             <Heading as="h1">Pay Up!</Heading>
 
-            <Skeleton isLoaded={!!paymentLink}>
+            <Skeleton isLoaded={!!paymentLink} minW="400px">
                 {paymentLink?.paymentMethod === "mollie" && paymentLink.paid ? (
                     <Heading color="green.500" textAlign="center">
                         You paid €{paymentLink?.amount.toFixed(2)} to {senderDisplayName}.
@@ -79,6 +79,10 @@ export default function Home({ params }: { params: { jwt: string } }) {
                         You still owe {senderDisplayName} €{paymentLink?.amount.toFixed(2)}!
                     </Heading>
                 )}
+            </Skeleton>
+
+            <Skeleton isLoaded={!!paymentLink} minW="300px" textAlign="center">
+                For {(paymentLink?.amountPerPaymentRequest as { name: string }[])?.map((e) => e.name).join(", ")}.
             </Skeleton>
 
             {paymentLink?.paymentMethod === "iban" &&

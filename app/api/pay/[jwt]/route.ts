@@ -61,6 +61,7 @@ export async function GET(request: NextRequest, { params }: { params: { jwt: str
             paidDate: true,
             paymentMethod: true,
             molliePaymentId: true,
+            amountPerPaymentRequest: true,
             receivingUser: {
                 select: {
                     email: true,
