@@ -9,6 +9,7 @@ import { signIn, signOut, useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
+import Confetti from "react-confetti";
 
 export default function Home({ params }: { params: { jwt: string } }) {
     const {
@@ -97,6 +98,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
                         {paid ? (
                             searchParams.get("status") === "paid" ? (
                                 <Heading color="green.500" textAlign="center">
+                                    <Confetti />
                                     You just paid {link.balance.moneyReceiver && getUserDisplayName(link.balance.moneyReceiver)}!
                                 </Heading>
                             ) : (
