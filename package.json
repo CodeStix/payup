@@ -29,6 +29,7 @@
     "html-to-text": "^9.0.5",
     "iban": "^0.0.14",
     "jsonwebtoken": "^9.0.2",
+    "math-expression-evaluator": "^2.0.4",
     "next": "14.0.4",
     "next-auth": "^4.24.5",
     "react": "^18",

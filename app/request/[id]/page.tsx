@@ -3,6 +3,7 @@
 import { AppHeader } from "@/components/AppHeader";
 import { EditableControls } from "@/components/EditableControls";
 import { LogOutButton } from "@/components/LogOutButton";
+import Mexp from "math-expression-evaluator";
 import { fetcher, getUserDisplayName, removeEmailDomain } from "@/util";
 import {
     Flex,
@@ -253,7 +254,17 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
     }
 
     async function updateAmount(amountStr: string) {
-        const amount = parseFloat(amountStr);
+        let amount;
+        try {
+            const mexp = new Mexp();
+            amount = mexp.eval(amountStr, [], {});
+            if (isNaN(amount)) {
+                throw true;
+            }
+        } catch {
+            amount = parseFloat(amountStr);
+        }
+
         if (isNaN(amount)) {
             console.error("Invalid amount");
         } else if (amount !== request?.amount) {
@@ -326,25 +337,32 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                             }}>
                             <FormControl isDisabled={isUpdating}>
                                 <FormLabel>Total amount</FormLabel>
-                                <NumberInput
-                                    onBlur={(ev) => {
-                                        setAmount(ev.target.value);
-                                        void updateAmount(ev.target.value);
-                                    }}
-                                    autoFocus
-                                    value={amount}
-                                    onChange={(ev) => setAmount(ev)}
-                                    max={100000}
-                                    min={1}>
-                                    <InputGroup>
-                                        <InputLeftAddon>€</InputLeftAddon>
-                                        <NumberInputField borderLeftRadius={0} />
-                                    </InputGroup>
+                                <InputGroup>
+                                    {/* <InputLeftAddon>€</InputLeftAddon> */}
+                                    <InputLeftElement pointerEvents="none" color="gray.300" fontSize="1.2em">
+                                        €
+                                    </InputLeftElement>
+
+                                    <Input
+                                        onBlur={(ev) => {
+                                            setAmount(ev.target.value);
+                                            void updateAmount(ev.target.value);
+                                        }}
+                                        autoFocus
+                                        value={amount}
+                                        onChange={(ev) => setAmount(ev.target.value)}
+                                        max={100000}
+                                        min={1}
+                                        type="text"></Input>
+                                </InputGroup>
+                                {/* <NumberInput
+                                    >
+                                
                                     <NumberInputStepper>
                                         <NumberIncrementStepper />
                                         <NumberDecrementStepper />
                                     </NumberInputStepper>
-                                </NumberInput>
+                                </NumberInput> */}
 
                                 <FormHelperText>Paid by you. This amount will be divided over your friends.</FormHelperText>
                             </FormControl>
@@ -361,7 +379,7 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                             <FormControl isDisabled={isUpdating}>
                                 <FormLabel>Who has to Pay Up?</FormLabel>
                                 <InputGroup>
-                                    <InputLeftElement pointerEvents="none" opacity={0.3}>
+                                    <InputLeftElement pointerEvents="none" color="gray.300">
                                         <FontAwesomeIcon icon={faSearch} />
                                     </InputLeftElement>
                                     <Input
@@ -436,7 +454,7 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                         </UnorderedList>
                     </Skeleton>
 
-                    <Divider />
+                    {(request?.usersToPay.length ?? 0) > 0 && <Divider />}
 
                     <Skeleton isLoaded={!!request}>
                         {(request?.usersToPay.length ?? 0) > 0 && (
