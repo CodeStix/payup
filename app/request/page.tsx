@@ -30,9 +30,10 @@ import {
     FormHelperText,
     FormLabel,
     Input,
+    useDisclosure,
 } from "@chakra-ui/react";
 import type { PaymentRequest, User } from "@prisma/client";
-import { faArrowRight, faCheck, faPlus, faTimes } from "@fortawesome/free-solid-svg-icons";
+import { faArrowRight, faCheck, faPlus, faTimes, faUserCog } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { signIn, signOut, useSession } from "next-auth/react";
 import { fetcher } from "@/util";
@@ -40,12 +41,14 @@ import { useRouter } from "next/navigation";
 import { LogOutButton } from "@/components/LogOutButton";
 import { AppHeader } from "@/components/AppHeader";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 function UserSettingsModal(props: { isOpen: boolean; onClose: () => void }) {
-    // const { isOpen, onOpen, onClose } = useDisclosure()
-    const { data: user } = useSWR<User>("/api/user", fetcher);
+    const { data: user, isLoading: isLoadingUser } = useSWR<User>("/api/user", fetcher);
     const [iban, setIban] = useState("");
     const [mollieApiKey, setMollieApiKey] = useState("");
+    const [saving, setSaving] = useState(false);
+    const [errors, setErrors] = useState<Record<string, string>>({});
 
     useEffect(() => {
         if (typeof user?.iban === "string") {
@@ -59,6 +62,27 @@ function UserSettingsModal(props: { isOpen: boolean; onClose: () => void }) {
         }
     }, [user?.mollieApiKey]);
 
+    async function saveChanges() {
+        setSaving(true);
+        setErrors({});
+        try {
+            const res = await fetch("/api/user", {
+                method: "PATCH",
+                body: JSON.stringify({
+                    mollieApiKey,
+                    iban,
+                }),
+            });
+            if (res.ok) {
+                props.onClose();
+            } else {
+                setErrors(await res.json());
+            }
+        } finally {
+            setSaving(false);
+        }
+    }
+
     return (
         <Modal isOpen={props.isOpen} onClose={props.onClose}>
             <ModalOverlay />
@@ -68,28 +92,44 @@ function UserSettingsModal(props: { isOpen: boolean; onClose: () => void }) {
                 <form
                     onSubmit={(ev) => {
                         ev.preventDefault();
-
-                        props.onClose();
+                        void saveChanges();
                     }}>
-                    <ModalBody>
-                        <FormControl isInvalid={false}>
+                    <ModalBody display="flex" flexDir="column" gap={4}>
+                        <FormControl isInvalid={"iban" in errors} isDisabled={saving || isLoadingUser}>
                             <FormLabel>IBAN</FormLabel>
                             <Input type="text" value={iban} onChange={(ev) => setIban(ev.target.value)} />
-                            <FormHelperText>
-                                This is required if you want to accept payments via your banking number. People can only send money to this address.
-                            </FormHelperText>
-                            {/* {!isError ? (
+                            {"iban" in errors ? (
+                                <FormErrorMessage>{errors["iban"]}</FormErrorMessage>
                             ) : (
-                                <FormErrorMessage>Email is required.</FormErrorMessage>
-                            )} */}
+                                <FormHelperText>
+                                    This is required if you want to accept payments via your banking number. People can only send money to this
+                                    address.
+                                </FormHelperText>
+                            )}
+                        </FormControl>
+
+                        <FormControl isInvalid={"mollieApiKey" in errors} isDisabled={saving || isLoadingUser}>
+                            <FormLabel>Mollie API key</FormLabel>
+                            <Input type="text" value={mollieApiKey} onChange={(ev) => setMollieApiKey(ev.target.value)} />
+                            {"mollieApiKey" in errors ? (
+                                <FormErrorMessage>{errors["mollieApiKey"]}</FormErrorMessage>
+                            ) : (
+                                <FormHelperText>
+                                    Optional. Visit the{" "}
+                                    <Link target="_blank" href="https://mollie.com">
+                                        mollie
+                                    </Link>{" "}
+                                    site to see what's up.
+                                </FormHelperText>
+                            )}
                         </FormControl>
                     </ModalBody>
 
                     <ModalFooter>
-                        <Button type="button" colorScheme="blue" mr={3} onClick={props.onClose}>
-                            Close
+                        <Button type="button" variant="ghost" colorScheme="blue" mr={3} onClick={props.onClose}>
+                            Cancel
                         </Button>
-                        <Button type="submit" variant="ghost">
+                        <Button isLoading={saving} colorScheme="green" isDisabled={saving} type="submit" variant="solid">
                             Save changes
                         </Button>
                     </ModalFooter>
@@ -106,6 +146,7 @@ export default function HomePage() {
         requests: (PaymentRequest & { usersToPay: { user: User; payedAmount: number; partsOfAmount: number }[] })[];
     }>("/api/request", fetcher);
     const [loading, setLoading] = useState(false);
+    const { isOpen: userSettingsIsOpen, onOpen: userSettingsOnOpen, onClose: userSettingsOnClose } = useDisclosure();
 
     async function createNew() {
         setLoading(true);
@@ -157,7 +198,8 @@ export default function HomePage() {
                                 // colorScheme="green"
                                 background="#eee"
                                 shadow="none"
-                                _hover={{ transform: "translate(0, -5px)" }}
+                                border="1px solid transparent"
+                                _hover={{ /*transform: "translate(0, -5px)",*/ background: "white", border: "1px solid #eee" }}
                                 style={{ transition: "100ms" }}
                                 cursor="pointer"
                                 onClick={() => router.push(`/request/${e.id}`)}>
@@ -184,12 +226,18 @@ export default function HomePage() {
                                 </CardFooter> */}
                             </Card>
                         ))}
+
+                        <Button leftIcon={<FontAwesomeIcon icon={faUserCog} />} variant="ghost" colorScheme="blue" onClick={userSettingsOnOpen}>
+                            Settings
+                        </Button>
                     </Flex>
                 </Skeleton>
 
                 {/* <Box mt={"auto"}></Box>
                 <LogOutButton /> */}
             </Flex>
+
+            <UserSettingsModal isOpen={userSettingsIsOpen} onClose={userSettingsOnClose} />
         </Flex>
     );
 }

@@ -65,6 +65,7 @@ import {
     faCheckDouble,
     faChevronLeft,
     faClipboard,
+    faClipboardCheck,
     faCoins,
     faCopy,
     faHourglass,
@@ -520,6 +521,11 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                         <Button w="full" colorScheme="red" leftIcon={<FontAwesomeIcon icon={faTrash} />} onClick={() => onOpenDelete()}>
                             Delete payment request
                         </Button>
+                        {request?.createdDate && (
+                            <Text opacity={0.5} fontSize="xs" as="p" mt={1}>
+                                Created at {new Date(request.createdDate).toLocaleString()}
+                            </Text>
+                        )}
                     </Skeleton>
 
                     <AlertDialog isOpen={isOpenDelete} leastDestructiveRef={cancelRef} onClose={onCloseDelete}>
@@ -583,6 +589,7 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
 }
 
 function PaymentLinkModal(props: { isOpen: boolean; onClose: () => void; paymentLink: string; showOpenButton: boolean }) {
+    const [copied, setCopied] = useState(false);
     return (
         <Modal isOpen={props.isOpen} onClose={props.onClose}>
             <ModalOverlay />
@@ -602,11 +609,13 @@ function PaymentLinkModal(props: { isOpen: boolean; onClose: () => void; payment
                         </Button>
                     )}
                     <Button
+                        colorScheme="green"
                         onClick={() => {
                             void navigator.clipboard.writeText(props.paymentLink);
+                            setCopied(true);
                         }}
-                        leftIcon={<FontAwesomeIcon icon={faClipboard} />}>
-                        Copy link to clipboard
+                        leftIcon={<FontAwesomeIcon icon={copied ? faClipboardCheck : faClipboard} />}>
+                        {copied ? <>Copied!</> : <>Copy link to clipboard</>}
                     </Button>
                     <QRCode
                         size={256}
