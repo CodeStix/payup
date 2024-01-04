@@ -146,6 +146,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     let prismaOperations: PrismaPromise<any>[] = [];
 
+    const paidById = body.paidBy?.id ?? existingRequest.paidById;
+
     // Calculate balance differences between users
     const existingUsersToPay = new Map<number, Partial<PaymentRequestToUser>>(existingRequest.usersToPay.map((e) => [e.userId, e]));
     const existingTotalParts = getTotalParts(existingRequest.usersToPay);
@@ -179,12 +181,13 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
             const diff = bodyAmount - existingAmount;
             if (diff !== 0) {
                 // Was adjusted
+                console.log("Adjusted", bodyUserToPayId, paidById, diff);
                 prismaOperations.push(
                     prisma.relativeUserBalance.upsert({
                         where: {
                             moneyHolderId_moneyReceiverId: {
-                                moneyReceiverId: diff >= 0 ? existingRequest.paidById : bodyUserToPayId,
-                                moneyHolderId: diff >= 0 ? bodyUserToPayId : existingRequest.paidById,
+                                moneyReceiverId: diff >= 0 ? paidById : bodyUserToPayId,
+                                moneyHolderId: diff >= 0 ? bodyUserToPayId : paidById,
                             },
                         },
                         update: {
@@ -194,8 +197,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                             lastRelatingPaymentRequestId: params.id,
                         },
                         create: {
-                            moneyReceiverId: diff >= 0 ? existingRequest.paidById : bodyUserToPayId,
-                            moneyHolderId: diff >= 0 ? bodyUserToPayId : existingRequest.paidById,
+                            moneyReceiverId: diff >= 0 ? paidById : bodyUserToPayId,
+                            moneyHolderId: diff >= 0 ? bodyUserToPayId : paidById,
                             amount: diff >= 0 ? bodyAmount : Math.abs(diff),
                             lastRelatingPaymentRequestId: params.id,
                         },
@@ -204,11 +207,12 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
             }
         } else {
             // New was added
+            console.log("Added", bodyUserToPayId, bodyAmount);
             prismaOperations.push(
                 prisma.relativeUserBalance.upsert({
                     where: {
                         moneyHolderId_moneyReceiverId: {
-                            moneyReceiverId: existingRequest.paidById,
+                            moneyReceiverId: paidById,
                             moneyHolderId: bodyUserToPayId,
                         },
                     },
@@ -219,7 +223,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                         lastRelatingPaymentRequestId: params.id,
                     },
                     create: {
-                        moneyReceiverId: existingRequest.paidById,
+                        moneyReceiverId: paidById,
                         moneyHolderId: bodyUserToPayId,
                         amount: bodyAmount,
                         lastRelatingPaymentRequestId: params.id,
@@ -239,7 +243,9 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         //     body.amount ?? existingRequest.amount,
         //     deletedUserToPay.partsOfAmount!
         // );
-        const deletedAmountTopay = calculateUserAmount(bodyTotalParts, body.amount ?? existingRequest.amount, deletedUserToPay.partsOfAmount!);
+
+        const deletedAmountTopay = calculateUserAmount(existingTotalParts, body.amount ?? existingRequest.amount, deletedUserToPay.partsOfAmount!);
+        console.log("Deleted", deletedUserToPayId, deletedAmountTopay);
         prismaOperations.push(
             prisma.relativeUserBalance.update({
                 where: {
@@ -287,7 +293,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
             data: {
                 description: body.description || "",
                 name: body.name || undefined,
-                paidById: body.paidBy?.id || undefined,
+                paidById: paidById,
                 amount: body.amount || undefined,
                 usersToPay: body.usersToPay
                     ? {
@@ -328,7 +334,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                                 avatarUrl: true,
                                 holdsMoneyFrom: {
                                     where: {
-                                        moneyReceiverId: existingRequest.paidById,
+                                        moneyReceiverId: paidById,
                                     },
                                     select: {
                                         amount: true,
@@ -337,7 +343,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                                 },
                                 shouldReceiveMoneyFrom: {
                                     where: {
-                                        moneyHolderId: existingRequest.paidById,
+                                        moneyHolderId: paidById,
                                     },
                                     select: {
                                         amount: true,

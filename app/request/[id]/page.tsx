@@ -355,7 +355,15 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                                         min={1}
                                         type="text"></Input>
                                 </InputGroup>
-                                <FormHelperText>Paid by you. This amount will be divided over your friends.</FormHelperText>
+                                {request?.paidBy && (
+                                    <FormHelperText>
+                                        Paid by{" "}
+                                        <Tooltip closeOnClick={false} openDelay={200} label="You can change the payer using the list below.">
+                                            {getUserDisplayName(request.paidBy, sessionData?.user)}
+                                        </Tooltip>
+                                        . This amount will be divided over your friends.
+                                    </FormHelperText>
+                                )}
                             </FormControl>
                         </form>
                     </Skeleton>
@@ -455,6 +463,42 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                     {(request?.usersToPay.length ?? 0) > 0 && <Divider />}
 
                     <Skeleton isLoaded={!!request}>
+                        <Text as="p" fontWeight="bold" color="blue.500">
+                            <FontAwesomeIcon icon={faCoins} /> User that paid
+                        </Text>
+
+                        <Flex alignItems="center" gap={2} my={1}>
+                            {request?.paidBy && (
+                                <Tooltip label={request?.paidBy.email ?? ""} openDelay={200}>
+                                    <Avatar
+                                        size="sm"
+                                        name={getUserDisplayName(request?.paidBy, sessionData?.user)}
+                                        src={request?.paidBy.avatarUrl ?? undefined}
+                                    />
+                                </Tooltip>
+                            )}
+
+                            {request?.paidBy && (
+                                <Tooltip label={request?.paidBy.email} openDelay={200}>
+                                    <Text wordBreak="break-word" fontWeight="normal">
+                                        {getUserDisplayName(request.paidBy, sessionData?.user)}
+                                    </Text>
+                                </Tooltip>
+                            )}
+                        </Flex>
+
+                        {/* <Spacer /> */}
+
+                        {/* <IconButton
+                            isDisabled={isUpdating}
+                            onClick={}
+                            size="sm"
+                            colorScheme="red"
+                            aria-label="Remove user"
+                            icon={<FontAwesomeIcon icon={faTimes} />}></IconButton> */}
+                    </Skeleton>
+
+                    <Skeleton isLoaded={!!request}>
                         {(request?.usersToPay.length ?? 0) > 0 && (
                             <Text as="p" fontWeight="bold" color="green.500">
                                 <FontAwesomeIcon icon={faCoins} /> Paying users
@@ -462,93 +506,37 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                         )}
                         <UnorderedList ml={0}>
                             {request?.usersToPay.map((e) => (
-                                <ListItem my={1} display="flex" key={e.user.id} alignItems="center" gap={2}>
-                                    <Tooltip label={e.user.email} openDelay={200}>
-                                        <Avatar size="sm" name={e.user.userName || e.user.email} src={e.user.avatarUrl || undefined} />
-                                    </Tooltip>
+                                <PayingUserListItem
+                                    request={request}
+                                    totalParts={totalParts}
+                                    key={e.user.id}
+                                    payingUser={e}
+                                    isDisabled={isUpdating}
+                                    onManualPayment={() => {
+                                        setManualPaymentMoneyHolder(e.user);
+                                        manualPaymentOnOpen();
+                                    }}
+                                    onPaymentLink={async (otherWay, instant) => {
+                                        let link;
+                                        if (otherWay) {
+                                            link = await generatePaymentLink(request.paidBy.id, e.user.id);
+                                        } else {
+                                            link = await generatePaymentLink(e.user.id, request.paidBy.id);
+                                        }
 
-                                    <Tooltip label={e.user.email} openDelay={200}>
-                                        <Text wordBreak="break-word" fontWeight="normal">
-                                            {getUserDisplayName(e.user, sessionData?.user)}
-                                        </Text>
-                                    </Tooltip>
-
-                                    {e.user.email !== sessionData?.user?.email && (
-                                        <PaymentStatusButton
-                                            onManualPayment={() => {
-                                                setManualPaymentMoneyHolder(e.user);
-                                                manualPaymentOnOpen();
-                                            }}
-                                            onPaymentLink={async (otherWay, instant) => {
-                                                let link;
-                                                if (otherWay) {
-                                                    link = await generatePaymentLink(request.paidBy.id, e.user.id);
-                                                } else {
-                                                    link = await generatePaymentLink(e.user.id, request.paidBy.id);
-                                                }
-
-                                                if (instant) {
-                                                    window.open(link, "_blank");
-                                                } else {
-                                                    paymentLinkOnOpen();
-                                                }
-                                            }}
-                                            isDisabled={isUpdating}
-                                            userToPay={e as any}
-                                            request={request}
-                                            totalParts={totalParts}
-                                        />
-                                    )}
-
-                                    <Spacer />
-
-                                    <Popover>
-                                        <PopoverTrigger>
-                                            <Button variant="link" color="green.500" mx={1} fontWeight="semibold" whiteSpace="nowrap">
-                                                € {((e.partsOfAmount / totalParts) * request.amount).toFixed(2)}
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent>
-                                            <PopoverArrow />
-                                            <PopoverCloseButton />
-                                            <PopoverHeader>Fraction of total amount</PopoverHeader>
-                                            <PopoverBody>
-                                                <Flex alignItems="center" gap={2}>
-                                                    <IconButton
-                                                        onClick={() => {
-                                                            void bindUser(e.user, e.partsOfAmount - 1);
-                                                        }}
-                                                        colorScheme="blue"
-                                                        isDisabled={isUpdating || e.partsOfAmount <= 1}
-                                                        aria-label="Less fraction of amount"
-                                                        icon={<FontAwesomeIcon icon={faSubtract} />}></IconButton>
-                                                    <Text px={2} as="span">
-                                                        {e.partsOfAmount}
-                                                    </Text>
-                                                    <IconButton
-                                                        isDisabled={isUpdating}
-                                                        onClick={() => {
-                                                            void bindUser(e.user, e.partsOfAmount + 1);
-                                                        }}
-                                                        colorScheme="blue"
-                                                        aria-label="More fraction of amount"
-                                                        icon={<FontAwesomeIcon icon={faPlus} />}></IconButton>
-                                                    {/* <Text whiteSpace={"nowrap"} as="p" opacity={0.5}>
-                                                    parts of {request.amount}.
-                                                </Text> */}
-                                                </Flex>
-                                            </PopoverBody>
-                                        </PopoverContent>
-                                    </Popover>
-
-                                    <IconButton
-                                        isDisabled={isUpdating}
-                                        onClick={() => void unbindUser(e.user)}
-                                        size="sm"
-                                        colorScheme="red"
-                                        aria-label="Remove user"
-                                        icon={<FontAwesomeIcon icon={faTimes} />}></IconButton>
-                                </ListItem>
+                                        if (instant) {
+                                            window.open(link, "_blank");
+                                        } else {
+                                            paymentLinkOnOpen();
+                                        }
+                                    }}
+                                    onChangeFraction={(newFraction) => {
+                                        void bindUser(e.user, newFraction);
+                                    }}
+                                    onRemove={() => {
+                                        void unbindUser(e.user);
+                                    }}
+                                />
                             ))}
                         </UnorderedList>
                     </Skeleton>
@@ -616,6 +604,97 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                 />
             )}
         </Flex>
+    );
+}
+
+function PayingUserListItem(props: {
+    request: PaymentRequest & { paidBy: User };
+    isDisabled: boolean;
+    payingUser: {
+        user: User;
+        partsOfAmount: number;
+    };
+    totalParts: number;
+    onManualPayment: () => void;
+    onPaymentLink: (otherWay: boolean, instant: boolean) => void;
+    onChangeFraction: (newFraction: number) => void;
+    onRemove: () => void;
+}) {
+    const e = props.payingUser;
+    const { data: sessionData } = useSession();
+
+    return (
+        <ListItem my={1} display="flex" key={e.user.id} alignItems="center" gap={2}>
+            <Tooltip label={e.user.email} openDelay={200}>
+                <Avatar size="sm" name={e.user.userName || e.user.email} src={e.user.avatarUrl || undefined} />
+            </Tooltip>
+
+            <Tooltip label={e.user.email} openDelay={200}>
+                <Text wordBreak="break-word" fontWeight="normal">
+                    {getUserDisplayName(e.user, sessionData?.user)}
+                </Text>
+            </Tooltip>
+
+            {e.user.email !== sessionData?.user?.email && (
+                <PaymentStatusButton
+                    onManualPayment={props.onManualPayment}
+                    onPaymentLink={props.onPaymentLink}
+                    isDisabled={props.isDisabled}
+                    userToPay={e as any}
+                    request={props.request}
+                    totalParts={props.totalParts}
+                />
+            )}
+
+            <Spacer />
+
+            <Popover>
+                <PopoverTrigger>
+                    <Button variant="link" color="green.500" mx={1} fontWeight="semibold" whiteSpace="nowrap">
+                        € {((e.partsOfAmount / props.totalParts) * props.request.amount).toFixed(2)}
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent>
+                    <PopoverArrow />
+                    <PopoverCloseButton />
+                    <PopoverHeader>Fraction of total amount</PopoverHeader>
+                    <PopoverBody>
+                        <Flex alignItems="center" gap={2}>
+                            <IconButton
+                                onClick={() => {
+                                    props.onChangeFraction(e.partsOfAmount - 1);
+                                }}
+                                colorScheme="blue"
+                                isDisabled={props.isDisabled || e.partsOfAmount <= 1}
+                                aria-label="Less fraction of amount"
+                                icon={<FontAwesomeIcon icon={faSubtract} />}></IconButton>
+                            <Text px={2} as="span">
+                                {e.partsOfAmount}
+                            </Text>
+                            <IconButton
+                                isDisabled={props.isDisabled}
+                                onClick={() => {
+                                    props.onChangeFraction(e.partsOfAmount + 1);
+                                }}
+                                colorScheme="blue"
+                                aria-label="More fraction of amount"
+                                icon={<FontAwesomeIcon icon={faPlus} />}></IconButton>
+                            {/* <Text whiteSpace={"nowrap"} as="p" opacity={0.5}>
+                    parts of {request.amount}.
+                </Text> */}
+                        </Flex>
+                    </PopoverBody>
+                </PopoverContent>
+            </Popover>
+
+            <IconButton
+                isDisabled={props.isDisabled}
+                onClick={props.onRemove}
+                size="sm"
+                colorScheme="red"
+                aria-label="Remove user"
+                icon={<FontAwesomeIcon icon={faTimes} />}></IconButton>
+        </ListItem>
     );
 }
 
