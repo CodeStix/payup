@@ -84,6 +84,7 @@ import {
     faSubtract,
     faTimes,
     faTrash,
+    faUserCheck,
     faWarning,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -170,7 +171,7 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
         }
     }
 
-    async function patch(n: Partial<PaymentRequest & { usersToPay: { user: { id: number }; partsOfAmount: number }[] }>) {
+    async function patch(n: Partial<PaymentRequest & { usersToPay: { user: { id: number }; userId?: number; partsOfAmount: number }[] }>) {
         setUpdating(true);
         try {
             const res = await fetch(`/api/request/${params.id}`, {
@@ -231,7 +232,25 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
         setUpdating(true);
         try {
             await patch({
-                usersToPay: [...request.usersToPay.filter((e) => e.user.id !== user.id), { user: user, partsOfAmount: partsOfAmount }],
+                usersToPay: [
+                    ...request.usersToPay.filter((e) => e.user.id !== user.id),
+                    { user: user, userId: user.id, partsOfAmount: partsOfAmount },
+                ],
+            });
+        } finally {
+            setUpdating(false);
+        }
+    }
+
+    async function updatePayingUser(userId: number) {
+        if (!request) {
+            console.error("Cannot updatePayingUser, not loaded");
+            return;
+        }
+        setUpdating(true);
+        try {
+            await patch({
+                paidById: userId,
             });
         } finally {
             setUpdating(false);
@@ -448,6 +467,13 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                                         </Text>
                                     </Tooltip>
                                     <Spacer />
+                                    {/* <IconButton
+                                        isDisabled={isUpdating}
+                                        onClick={() => void updatePayingUser(u.id)}
+                                        size="sm"
+                                        colorScheme="blue"
+                                        aria-label="Set as paying user"
+                                        icon={<FontAwesomeIcon icon={faCoins} />}></IconButton> */}
                                     <IconButton
                                         isDisabled={isUpdating}
                                         onClick={() => void bindUser(u)}
@@ -486,16 +512,6 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                                 </Tooltip>
                             )}
                         </Flex>
-
-                        {/* <Spacer /> */}
-
-                        {/* <IconButton
-                            isDisabled={isUpdating}
-                            onClick={}
-                            size="sm"
-                            colorScheme="red"
-                            aria-label="Remove user"
-                            icon={<FontAwesomeIcon icon={faTimes} />}></IconButton> */}
                     </Skeleton>
 
                     <Skeleton isLoaded={!!request}>
@@ -535,6 +551,9 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                                     }}
                                     onRemove={() => {
                                         void unbindUser(e.user);
+                                    }}
+                                    onSetPayingUser={() => {
+                                        void updatePayingUser(e.user.id);
                                     }}
                                 />
                             ))}
@@ -619,6 +638,7 @@ function PayingUserListItem(props: {
     onPaymentLink: (otherWay: boolean, instant: boolean) => void;
     onChangeFraction: (newFraction: number) => void;
     onRemove: () => void;
+    onSetPayingUser: () => void;
 }) {
     const e = props.payingUser;
     const { data: sessionData } = useSession();
@@ -635,16 +655,17 @@ function PayingUserListItem(props: {
                 </Text>
             </Tooltip>
 
-            {e.user.email !== sessionData?.user?.email && (
-                <PaymentStatusButton
-                    onManualPayment={props.onManualPayment}
-                    onPaymentLink={props.onPaymentLink}
-                    isDisabled={props.isDisabled}
-                    userToPay={e as any}
-                    request={props.request}
-                    totalParts={props.totalParts}
-                />
-            )}
+            {/* {e.user.email !== sessionData?.user?.email && ( */}
+            <PaymentStatusButton
+                onManualPayment={props.onManualPayment}
+                onPaymentLink={props.onPaymentLink}
+                onSetPayingUser={props.onSetPayingUser}
+                isDisabled={props.isDisabled}
+                userToPay={e as any}
+                request={props.request}
+                totalParts={props.totalParts}
+            />
+            {/* )} */}
 
             <Spacer />
 
@@ -873,6 +894,7 @@ function PaymentStatusButton(props: {
 
     onPaymentLink: (otherWay: boolean, instant: boolean) => void;
     onManualPayment: () => void;
+    onSetPayingUser: () => void;
 }) {
     const { status, data: sessionData } = useSession();
     const lastPaymentDate = props.userToPay.user.holdsMoneyFrom[0]?.lastPaymentDate;
@@ -952,6 +974,18 @@ function PaymentStatusButton(props: {
                             size="sm"
                             leftIcon={<FontAwesomeIcon icon={faMoneyBill} />}>
                             Add manual payment
+                        </Button>
+                    )}
+
+                    {props.request.paidBy.id !== props.userToPay.userId && (
+                        <Button
+                            isDisabled={props.isDisabled}
+                            variant="ghost"
+                            onClick={props.onSetPayingUser}
+                            colorScheme="blue"
+                            size="sm"
+                            leftIcon={<FontAwesomeIcon icon={faUserCheck} />}>
+                            Set as paying user
                         </Button>
                     )}
                 </PopoverBody>
