@@ -112,7 +112,7 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
     const { isOpen: paymentLinkIsOpen, onOpen: paymentLinkOnOpen, onClose: paymentLinkOnClose } = useDisclosure();
     const { isOpen: manualPaymentIsOpen, onOpen: manualPaymentOnOpen, onClose: manualPaymentOnClose } = useDisclosure();
     const [generatedPaymentLink, setGeneratedPaymentLink] = useState("");
-    const [showOpenPaymentLinkButton, setShowOpenPaymentLinkButton] = useState(false);
+    // const [showOpenPaymentLinkButton, setShowOpenPaymentLinkButton] = useState(false);
 
     const totalParts = useMemo(() => {
         let parts = 0;
@@ -155,7 +155,7 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
             } else {
                 const data = await res.json();
                 setGeneratedPaymentLink(data.paymentLink);
-                paymentLinkOnOpen();
+                return data.paymentLink;
             }
         } finally {
             setUpdating(false);
@@ -443,13 +443,18 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
 
                                     <PaymentStatusButton
                                         onManualPayment={() => {}}
-                                        onPaymentLink={(otherWay) => {
+                                        onPaymentLink={async (otherWay, instant) => {
+                                            let link;
                                             if (otherWay) {
-                                                setShowOpenPaymentLinkButton(request.paidBy.email === sessionData?.user?.email);
-                                                generatePaymentLink(request.paidBy.id, e.user.id);
+                                                link = await generatePaymentLink(request.paidBy.id, e.user.id);
                                             } else {
-                                                setShowOpenPaymentLinkButton(false);
-                                                generatePaymentLink(e.user.id, request.paidBy.id);
+                                                link = await generatePaymentLink(e.user.id, request.paidBy.id);
+                                            }
+
+                                            if (instant) {
+                                                window.open(link, "_blank");
+                                            } else {
+                                                paymentLinkOnOpen();
                                             }
                                         }}
                                         isDisabled={isUpdating}
@@ -571,12 +576,7 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                 </ModalContent>
             </Modal> */}
             {generatedPaymentLink && (
-                <PaymentLinkModal
-                    showOpenButton={showOpenPaymentLinkButton}
-                    isOpen={paymentLinkIsOpen}
-                    onClose={paymentLinkOnClose}
-                    paymentLink={generatedPaymentLink}
-                />
+                <PaymentLinkModal showOpenButton={false} isOpen={paymentLinkIsOpen} onClose={paymentLinkOnClose} paymentLink={generatedPaymentLink} />
             )}
         </Flex>
     );
@@ -634,7 +634,8 @@ function PaymentStatusButton(props: {
     totalParts: number;
     request: PaymentRequest & { paidBy: User };
     isDisabled: boolean;
-    onPaymentLink: (otherWay: boolean) => void;
+
+    onPaymentLink: (otherWay: boolean, instant: boolean) => void;
     onManualPayment: () => void;
 }) {
     const { status, data: sessionData } = useSession();
@@ -653,7 +654,7 @@ function PaymentStatusButton(props: {
                     icon={<FontAwesomeIcon icon={amount === 0 ? faCheck : amount > 0 ? faHourglass : faWarning} />}
                 />
             </PopoverTrigger>
-            <PopoverContent pr={4} w="300px">
+            <PopoverContent pr={4}>
                 <PopoverArrow />
                 <PopoverCloseButton />
                 <PopoverHeader>Payment status</PopoverHeader>
@@ -672,32 +673,42 @@ function PaymentStatusButton(props: {
                         </Text>
                     )}
 
-                    {amount < -0.01 && (
+                    {/* {amount < -0.01 && (
                         <Text as="p" opacity={0.5}>
                             But don&apos;t worry, you will be notified automatically when you should pay it back.
                         </Text>
-                    )}
+                    )} */}
                     {amount > 0.01 && (
                         <Text as="p" opacity={0.5}>
-                            But don&apos;t worry, they will be notified automatically when they should pay you again.
+                            {getUserDisplayName(props.userToPay.user)} will be notified periodically (weekly) if they haven't paid. You can also share
+                            a payment link by pressing the green button.
                         </Text>
                     )}
 
-                    {Math.abs(amount) > 0.01 && (
+                    {amount < -0.01 && sessionData?.user?.email === props.request.paidBy.email ? (
+                        <Button
+                            onClick={() => props.onPaymentLink(amount < -0.01, true)}
+                            colorScheme="green"
+                            rightIcon={<FontAwesomeIcon icon={faArrowRight} />}>
+                            Pay back now
+                        </Button>
+                    ) : Math.abs(amount) > 0.01 ? (
                         <Button
                             variant="solid"
                             isDisabled={props.isDisabled}
-                            onClick={() => props.onPaymentLink(amount < -0.01)}
+                            onClick={() => props.onPaymentLink(amount < -0.01, false)}
                             colorScheme="green"
-                            size="sm"
+                            // size="sm"
                             leftIcon={<FontAwesomeIcon icon={faLink} />}>
                             Show payment link
                         </Button>
+                    ) : (
+                        <></>
                     )}
 
                     <Button
                         isDisabled={props.isDisabled || props.request.paidBy.email !== sessionData?.user?.email}
-                        variant="solid"
+                        variant="ghost"
                         onClick={props.onManualPayment}
                         colorScheme="blue"
                         size="sm"
@@ -705,18 +716,18 @@ function PaymentStatusButton(props: {
                         Add manual payment
                     </Button>
                 </PopoverBody>
-                <PopoverFooter>
-                    <Text as="p" opacity={0.5} fontSize="xs">
-                        {lastPaymentDate && (
+                {lastPaymentDate && (
+                    <PopoverFooter>
+                        <Text as="p" opacity={0.5} fontSize="xs">
                             <>
                                 Last payment at{" "}
                                 <Text fontWeight="normal" as="span">
                                     {new Date(lastPaymentDate).toLocaleString()}
                                 </Text>
                             </>
-                        )}
-                    </Text>
-                </PopoverFooter>
+                        </Text>
+                    </PopoverFooter>
+                )}
             </PopoverContent>
         </Popover>
     );
