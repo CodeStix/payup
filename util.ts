@@ -4,7 +4,12 @@ export function removeEmailDomain(email: string) {
     return email.split("@")[0];
 }
 
-export function getUserDisplayName(u: { userName?: string | null; email: string }) {
+export function getUserDisplayName(u: { userName?: string | null; email: string; id?: number }, me?: { id?: number | null; email?: string | null }) {
+    if (me) {
+        if ((me.email && u.email === me.email) || (me.id && u.id && me.id === u.id)) {
+            return "You";
+        }
+    }
     return u.userName || removeEmailDomain(u.email);
 }
 

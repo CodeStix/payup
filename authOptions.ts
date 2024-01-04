@@ -43,11 +43,18 @@ export const authOptions: AuthOptions = {
                 },
             });
 
-            await prisma.userToUser.create({
-                data: {
+            await prisma.userToUser.upsert({
+                where: {
+                    requesterId_responderId: {
+                        requesterId: newUser.id,
+                        responderId: newUser.id,
+                    },
+                },
+                create: {
                     requesterId: newUser.id,
                     responderId: newUser.id,
                 },
+                update: {},
             });
 
             return true;

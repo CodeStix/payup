@@ -69,6 +69,7 @@ import {
     faClipboardCheck,
     faCoins,
     faCopy,
+    faExclamationTriangle,
     faHandHoldingDollar,
     faHandshake,
     faHourglass,
@@ -446,30 +447,32 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                                     </Text>
                                     <Spacer />
 
-                                    <PaymentStatusButton
-                                        onManualPayment={() => {
-                                            setManualPaymentMoneyHolder(e.user);
-                                            manualPaymentOnOpen();
-                                        }}
-                                        onPaymentLink={async (otherWay, instant) => {
-                                            let link;
-                                            if (otherWay) {
-                                                link = await generatePaymentLink(request.paidBy.id, e.user.id);
-                                            } else {
-                                                link = await generatePaymentLink(e.user.id, request.paidBy.id);
-                                            }
+                                    {e.user.email !== sessionData?.user?.email && (
+                                        <PaymentStatusButton
+                                            onManualPayment={() => {
+                                                setManualPaymentMoneyHolder(e.user);
+                                                manualPaymentOnOpen();
+                                            }}
+                                            onPaymentLink={async (otherWay, instant) => {
+                                                let link;
+                                                if (otherWay) {
+                                                    link = await generatePaymentLink(request.paidBy.id, e.user.id);
+                                                } else {
+                                                    link = await generatePaymentLink(e.user.id, request.paidBy.id);
+                                                }
 
-                                            if (instant) {
-                                                window.open(link, "_blank");
-                                            } else {
-                                                paymentLinkOnOpen();
-                                            }
-                                        }}
-                                        isDisabled={isUpdating}
-                                        userToPay={e as any}
-                                        request={request}
-                                        totalParts={totalParts}
-                                    />
+                                                if (instant) {
+                                                    window.open(link, "_blank");
+                                                } else {
+                                                    paymentLinkOnOpen();
+                                                }
+                                            }}
+                                            isDisabled={isUpdating}
+                                            userToPay={e as any}
+                                            request={request}
+                                            totalParts={totalParts}
+                                        />
+                                    )}
 
                                     <Popover>
                                         <PopoverTrigger>
@@ -777,33 +780,34 @@ function PaymentStatusButton(props: {
                 <PopoverHeader>Payment status</PopoverHeader>
                 <PopoverBody display="flex" gap={2} flexDir="column">
                     {amount === 0 ? (
-                        <Text as="p" colorScheme="green.500" fontWeight="semibold">
-                            {getUserDisplayName(props.request.paidBy)} and {getUserDisplayName(props.userToPay.user)} are even
+                        <Text as="p" color="green.500" fontWeight="semibold">
+                            <FontAwesomeIcon icon={faCheckCircle} /> {getUserDisplayName(props.request.paidBy, sessionData?.user)} and{" "}
+                            {getUserDisplayName(props.userToPay.user, sessionData?.user)} are even
                         </Text>
                     ) : amount > 0 ? (
-                        <Text as="p" colorScheme="yellow.500" fontWeight="semibold">
-                            {getUserDisplayName(props.userToPay.user)} still ows {getUserDisplayName(props.request.paidBy)} €{amount.toFixed(2)}
+                        <Text as="p" color="yellow.500" fontWeight="semibold">
+                            <FontAwesomeIcon icon={faExclamationTriangle} /> {getUserDisplayName(props.userToPay.user, sessionData?.user)} still ows{" "}
+                            {getUserDisplayName(props.request.paidBy, sessionData?.user)} €{amount.toFixed(2)}
                         </Text>
                     ) : (
-                        <Text as="p" colorScheme="yellow.500" fontWeight="semibold">
-                            {getUserDisplayName(props.request.paidBy)} still ows {getUserDisplayName(props.userToPay.user)} €{-amount.toFixed(2)} back
+                        <Text as="p" color="yellow.500" fontWeight="semibold">
+                            <FontAwesomeIcon icon={faExclamationTriangle} /> {getUserDisplayName(props.request.paidBy, sessionData?.user)} still ows{" "}
+                            {getUserDisplayName(props.userToPay.user, sessionData?.user)} €{-amount.toFixed(2)} back
                         </Text>
                     )}
 
-                    {/* {amount < -0.01 && (
-                        <Text as="p" opacity={0.5}>
-                            But don&apos;t worry, you will be notified automatically when you should pay it back.
-                        </Text>
-                    )} */}
                     {amount > 0.01 && (
                         <Text as="p" opacity={0.5}>
-                            {getUserDisplayName(props.userToPay.user)} will be notified periodically (weekly) if they haven't paid. You can also share
-                            a payment link by pressing the green button.
+                            {getUserDisplayName(props.userToPay.user, sessionData?.user)} will be notified periodically (weekly) if they haven't paid.
+                            You can also share a payment link by pressing the green button.
                         </Text>
                     )}
+
+                    <Divider />
 
                     {amount < -0.01 && sessionData?.user?.email === props.request.paidBy.email ? (
                         <Button
+                            isDisabled={props.isDisabled}
                             onClick={() => props.onPaymentLink(amount < -0.01, true)}
                             colorScheme="green"
                             rightIcon={<FontAwesomeIcon icon={faArrowRight} />}>

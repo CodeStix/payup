@@ -110,7 +110,12 @@ function UserSettingsModal(props: { isOpen: boolean; onClose: () => void }) {
 
                         <FormControl isInvalid={"mollieApiKey" in errors} isDisabled={saving || isLoadingUser}>
                             <FormLabel>Mollie API key</FormLabel>
-                            <Input type="text" value={mollieApiKey} onChange={(ev) => setMollieApiKey(ev.target.value)} />
+                            <Input
+                                placeholder="prod_abcdefghi"
+                                type="text"
+                                value={mollieApiKey}
+                                onChange={(ev) => setMollieApiKey(ev.target.value)}
+                            />
                             {"mollieApiKey" in errors ? (
                                 <FormErrorMessage>{errors["mollieApiKey"]}</FormErrorMessage>
                             ) : (
