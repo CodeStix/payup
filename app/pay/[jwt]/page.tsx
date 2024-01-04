@@ -1,7 +1,7 @@
 "use client";
 
 import { fetcher, getUserDisplayName, removeEmailDomain } from "@/util";
-import { Button, Text, Center, Heading, Skeleton, AlertTitle, Alert, AlertIcon, Flex, Link } from "@chakra-ui/react";
+import { Button, Text, Center, Heading, Skeleton, AlertTitle, Alert, AlertIcon, Flex, Link, Avatar } from "@chakra-ui/react";
 import { faArrowRight, faCheckCircle, faClipboard, faClipboardCheck } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { RelativeUserBalance, User } from "@prisma/client";
@@ -204,6 +204,19 @@ export default function Home({ params }: { params: { jwt: string } }) {
                             paid or not.
                             {/* You can close this page if you already paid it, you won&apos;t be notified again. */}
                         </>
+                    )}
+                    {link?.balance.moneyHolder && (
+                        <Text as="p">
+                            Logged in as{" "}
+                            <Avatar
+                                size="xs"
+                                name={getUserDisplayName(link.balance.moneyHolder)}
+                                src={link.balance.moneyHolder.avatarUrl || undefined}></Avatar>{" "}
+                            {getUserDisplayName(link.balance.moneyHolder)}.{" "}
+                            <Button onClick={() => alert("This page is not meant for you, please close it")} variant="link">
+                                Not you?
+                            </Button>
+                        </Text>
                     )}
                 </Text>
             </Skeleton>

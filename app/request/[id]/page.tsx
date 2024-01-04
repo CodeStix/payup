@@ -58,6 +58,7 @@ import {
     ModalHeader,
     ModalOverlay,
     ButtonGroup,
+    Tooltip,
 } from "@chakra-ui/react";
 import {
     faArrowRight,
@@ -408,15 +409,20 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                         <UnorderedList ml={0}>
                             {filteredSearchResults.map((u) => (
                                 <ListItem my={1} display="flex" key={u.id} alignItems="center" gap={2}>
-                                    <Avatar size="sm" name={u.userName || u.email} src={u.avatarUrl || undefined} />
-                                    <Text wordBreak="break-word" fontWeight="normal">
-                                        {u.userName || removeEmailDomain(u.email)}{" "}
-                                        {u.email === sessionData?.user?.email && (
-                                            <Text as="span" opacity={0.5}>
-                                                (you)
-                                            </Text>
-                                        )}
-                                    </Text>
+                                    <Tooltip label={u.email} openDelay={200}>
+                                        <Avatar size="sm" name={getUserDisplayName(u)} src={u.avatarUrl || undefined} />
+                                    </Tooltip>
+
+                                    <Tooltip label={u.email} openDelay={200}>
+                                        <Text wordBreak="break-word" fontWeight="normal">
+                                            {getUserDisplayName(u, sessionData?.user)}{" "}
+                                            {/* {u.email === sessionData?.user?.email && (
+                                                <Text as="span" opacity={0.5}>
+                                                    (you)
+                                                </Text>
+                                            )} */}
+                                        </Text>
+                                    </Tooltip>
                                     <Spacer />
                                     <IconButton
                                         isDisabled={isUpdating}
@@ -441,11 +447,15 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                         <UnorderedList ml={0}>
                             {request?.usersToPay.map((e) => (
                                 <ListItem my={1} display="flex" key={e.user.id} alignItems="center" gap={2}>
-                                    <Avatar size="sm" name={e.user.userName || e.user.email} src={e.user.avatarUrl || undefined} />
-                                    <Text wordBreak="break-word" fontWeight="normal">
-                                        {e.user.userName || removeEmailDomain(e.user.email)}
-                                    </Text>
-                                    <Spacer />
+                                    <Tooltip label={e.user.email} openDelay={200}>
+                                        <Avatar size="sm" name={e.user.userName || e.user.email} src={e.user.avatarUrl || undefined} />
+                                    </Tooltip>
+
+                                    <Tooltip label={e.user.email} openDelay={200}>
+                                        <Text wordBreak="break-word" fontWeight="normal">
+                                            {getUserDisplayName(e.user, sessionData?.user)}
+                                        </Text>
+                                    </Tooltip>
 
                                     {e.user.email !== sessionData?.user?.email && (
                                         <PaymentStatusButton
@@ -473,6 +483,8 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                                             totalParts={totalParts}
                                         />
                                     )}
+
+                                    <Spacer />
 
                                     <Popover>
                                         <PopoverTrigger>
@@ -623,7 +635,7 @@ function ManualPaymentModal(props: { isOpen: boolean; onClose: () => void; money
                 <form
                     onSubmit={(ev) => {
                         ev.preventDefault();
-                        if (!(parseFloat(amount) > 0.01)) {
+                        if (!(parseFloat(amount) >= 0.01)) {
                             return;
                         }
                         void submit();
@@ -687,7 +699,7 @@ function ManualPaymentModal(props: { isOpen: boolean; onClose: () => void; money
                         <Button
                             isLoading={submitting}
                             leftIcon={<FontAwesomeIcon icon={faCoins} />}
-                            isDisabled={submitting || !(parseFloat(amount) > 0.01)}
+                            isDisabled={submitting || !(parseFloat(amount) >= 0.01)}
                             colorScheme="green"
                             type="submit">
                             Add manual payment
@@ -766,12 +778,12 @@ function PaymentStatusButton(props: {
         <Popover>
             <PopoverTrigger>
                 <IconButton
-                    colorScheme={amount === 0 ? "green" : amount > 0 ? "blue" : "blue"}
+                    colorScheme={Math.abs(amount) < 0.01 ? "green" : amount > 0 ? "blue" : "blue"}
                     size="xs"
                     rounded={"full"}
                     variant="solid"
                     aria-label="Payment status"
-                    icon={<FontAwesomeIcon icon={amount === 0 ? faCheck : amount > 0 ? faHourglass : faWarning} />}
+                    icon={<FontAwesomeIcon icon={Math.abs(amount) < 0.01 ? faCheck : amount >= 0.01 ? faHourglass : faWarning} />}
                 />
             </PopoverTrigger>
             <PopoverContent pr={4}>
@@ -779,12 +791,12 @@ function PaymentStatusButton(props: {
                 <PopoverCloseButton />
                 <PopoverHeader>Payment status</PopoverHeader>
                 <PopoverBody display="flex" gap={2} flexDir="column">
-                    {amount === 0 ? (
+                    {Math.abs(amount) < 0.01 ? (
                         <Text as="p" color="green.500" fontWeight="semibold">
                             <FontAwesomeIcon icon={faCheckCircle} /> {getUserDisplayName(props.request.paidBy, sessionData?.user)} and{" "}
                             {getUserDisplayName(props.userToPay.user, sessionData?.user)} are even
                         </Text>
-                    ) : amount > 0 ? (
+                    ) : amount >= 0.01 ? (
                         <Text as="p" color="yellow.500" fontWeight="semibold">
                             <FontAwesomeIcon icon={faExclamationTriangle} /> {getUserDisplayName(props.userToPay.user, sessionData?.user)} still ows{" "}
                             {getUserDisplayName(props.request.paidBy, sessionData?.user)} €{amount.toFixed(2)}
@@ -796,7 +808,7 @@ function PaymentStatusButton(props: {
                         </Text>
                     )}
 
-                    {amount > 0.01 && (
+                    {amount >= 0.01 && (
                         <Text as="p" opacity={0.5}>
                             {getUserDisplayName(props.userToPay.user, sessionData?.user)} will be notified periodically (weekly) if they haven't paid.
                             You can also share a payment link by pressing the green button.
@@ -805,19 +817,19 @@ function PaymentStatusButton(props: {
 
                     <Divider />
 
-                    {amount < -0.01 && sessionData?.user?.email === props.request.paidBy.email ? (
+                    {amount <= -0.01 && sessionData?.user?.email === props.request.paidBy.email ? (
                         <Button
                             isDisabled={props.isDisabled}
-                            onClick={() => props.onPaymentLink(amount < -0.01, true)}
+                            onClick={() => props.onPaymentLink(amount < 0, true)}
                             colorScheme="green"
                             rightIcon={<FontAwesomeIcon icon={faArrowRight} />}>
                             Pay back now
                         </Button>
-                    ) : Math.abs(amount) > 0.01 ? (
+                    ) : Math.abs(amount) >= 0.01 ? (
                         <Button
                             variant="solid"
                             isDisabled={props.isDisabled}
-                            onClick={() => props.onPaymentLink(amount < -0.01, false)}
+                            onClick={() => props.onPaymentLink(amount < 0, false)}
                             colorScheme="green"
                             // size="sm"
                             leftIcon={<FontAwesomeIcon icon={faLink} />}>

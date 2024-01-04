@@ -21,134 +21,6 @@ AWS.config.update({
 
 let ses = new AWS.SES();
 
-/*export async function calculateOwingUsers() {
-    const payingUserOpenRequests = await prisma.paymentRequestToUser.findMany({
-        where: {
-            paymentComplete: false,
-        },
-        select: {
-            user: {
-                select: {
-                    id: true,
-                    email: true,
-                    userName: true,
-                    iban: true,
-                    mollieApiKey: true,
-                },
-            },
-            partsOfAmount: true,
-            lastNotificationDate: true,
-            payedAmount: true,
-            paymentRequest: {
-                select: {
-                    id: true,
-                    name: true,
-                    paidBy: {
-                        select: {
-                            id: true,
-                            userName: true,
-                            email: true,
-                            iban: true,
-                            mollieApiKey: true,
-                        },
-                    },
-                    amount: true,
-                },
-            },
-        },
-    });
-
-    const partsPerRequest = new Map<string, number>();
-
-    for (const paymentPerUser of payingUserOpenRequests) {
-        const paymentRequestId = paymentPerUser.paymentRequest.id;
-        partsPerRequest.set(paymentRequestId, (partsPerRequest.get(paymentRequestId) ?? 0) + paymentPerUser.partsOfAmount);
-    }
-
-    const balancePerUserPair = new Map<
-        string,
-        {
-            ows: User;
-            paidBy: User;
-            amount: number;
-            settlesPaymentsRequests: { paymentRequestId: string; userId: number; amount: number; name: string }[];
-        }
-    >();
-
-    for (const paymentPerUser of payingUserOpenRequests) {
-        const partsInRequest = partsPerRequest.get(paymentPerUser.paymentRequest.id)!;
-        const paidById = paymentPerUser.paymentRequest.paidBy.id;
-        const owsId = paymentPerUser.user.id;
-
-        const shouldPayAmount = (paymentPerUser.partsOfAmount / partsInRequest) * paymentPerUser.paymentRequest.amount;
-        const stillOws = shouldPayAmount - paymentPerUser.payedAmount;
-
-        const settled = paidById === owsId || Math.abs(stillOws) < 0.01;
-        if (settled) {
-            console.log("Settled", owsId, "->", paidById);
-
-            await prisma.paymentRequestToUser.update({
-                where: {
-                    userId_paymentRequestId: {
-                        userId: paymentPerUser.user.id,
-                        paymentRequestId: paymentPerUser.paymentRequest.id,
-                    },
-                },
-                data: {
-                    paymentComplete: true,
-                    payedAmount: shouldPayAmount,
-                },
-            });
-        } else {
-            // console.log("Should still pay", owsId, "->", paidById, "=", stillOws);
-
-            const userPairKey = `${owsId}->${paidById}`;
-            if (balancePerUserPair.has(userPairKey)) {
-                const current = balancePerUserPair.get(userPairKey)!;
-                current.amount += stillOws;
-                current.settlesPaymentsRequests.push({
-                    paymentRequestId: paymentPerUser.paymentRequest.id,
-                    userId: paymentPerUser.user.id,
-                    amount: stillOws,
-                    name: paymentPerUser.paymentRequest.name,
-                });
-            } else {
-                const invertedUserPairKey = `${paidById}->${owsId}`;
-                if (balancePerUserPair.has(invertedUserPairKey)) {
-                    const current = balancePerUserPair.get(invertedUserPairKey)!;
-                    current.amount -= stillOws;
-                    current.settlesPaymentsRequests.push({
-                        paymentRequestId: paymentPerUser.paymentRequest.id,
-                        userId: paymentPerUser.user.id,
-                        amount: stillOws,
-                        name: paymentPerUser.paymentRequest.name,
-                    });
-                } else {
-                    balancePerUserPair.set(userPairKey, {
-                        amount: stillOws,
-                        ows: paymentPerUser.user as User,
-                        paidBy: paymentPerUser.paymentRequest.paidBy as User,
-                        settlesPaymentsRequests: [
-                            {
-                                paymentRequestId: paymentPerUser.paymentRequest.id,
-                                userId: paymentPerUser.user.id,
-                                amount: stillOws,
-                                name: paymentPerUser.paymentRequest.name,
-                            },
-                        ],
-                    });
-                }
-            }
-        }
-    }
-
-    // for (const owing of Array.from(balancePerUserPair.values())) {
-    //     console.log(owing.ows.email, "ows", owing.paidBy.email, "amount", owing.amount);
-    // }
-
-    return Array.from(balancePerUserPair.values());
-}*/
-
 export type JwtPayload = {
     // User id that should receive money
     r: number;
@@ -169,20 +41,8 @@ export async function generatePaymentLink(holder: number, receiver: number, amou
         o: amount,
     };
 
-    // const link = await prisma.paymentLink.create({
-    //     data: {
-    //         amount: amount,
-    //         sendingUserId: paidBy.id,
-    //         receivingUserId: ows.id,
-    //         amountPerPaymentRequest: paidPaymentsRequests,
-    //         paymentMethod: paidBy.mollieApiKey ? "mollie" : "iban",
-    //         paid: false,
-    //     },
-    // });
-
     const jwtString = generateJwt(jwtPayload);
     return `${SERVER_URL}/pay/${encodeURIComponent(jwtString)}`;
-    // return `${SERVER_URL}/pay/${encodeURIComponent(link.id)}`;
 }
 
 export function getEmailHtml(template: string, fields: Record<string, string>) {
@@ -273,7 +133,6 @@ export async function notifyUsers() {
 }
 
 async function sendMail(receiver: string, subject: string, body: string) {
-    // if (receiver === "reddusted@gmail.com" || receiver === "stijn.rogiest@gmail.com")
     await ses
         .sendEmail({
             Destination: {
@@ -298,5 +157,4 @@ async function sendMail(receiver: string, subject: string, body: string) {
         .then((e) => {
             console.log("Sent mail to", receiver);
         });
-    // else console.warn("Sent email to (skipped)", receiver, subject);
 }
