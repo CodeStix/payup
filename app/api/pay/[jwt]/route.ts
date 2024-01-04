@@ -15,8 +15,6 @@ export async function GET(request: NextRequest, { params }: { params: { jwt: str
         return NextResponse.json({}, { status: 400 });
     }
 
-    console.log("jwt", jwtPayLoad);
-
     const balance = await prisma.relativeUserBalance.findUnique({
         where: {
             moneyHolderId_moneyReceiverId: {

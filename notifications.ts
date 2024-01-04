@@ -104,6 +104,8 @@ export async function notifyUsers(all: boolean) {
         },
     });
 
+    console.log("Found", balances.length, "balances to notify about", all ? "(all)" : "(timed)");
+
     await prisma.relativeUserBalance.updateMany({
         where: condition,
         data: {
@@ -133,25 +135,37 @@ export async function notifyUsers(all: boolean) {
 
         const paymentLink = await generatePaymentLink(balance.moneyHolder.id, balance.moneyReceiver.id, owsAmount);
 
-        console.log(balance.moneyHolder.email, "should send money to", balance.moneyReceiver.email, "=", owsAmount, paymentLink);
-
-        await sendMail(
+        console.log(
+            "Notify",
             balance.moneyHolder.email,
-            `You still owe ${getUserDisplayName(balance.moneyReceiver)} money, pay up!`,
-            getEmailHtml(emailTemplateString, {
-                paymentLink,
-                userName: getUserDisplayName(balance.moneyHolder),
-                paidByUserName: getUserDisplayName(balance.moneyReceiver),
-                paidByEmail: balance.moneyReceiver.email,
-                description:
-                    (balance.lastRelatingPaymentRequest?.name ?? "an unknown reason") +
-                    (otherWayBalance && otherWayBalance.lastRelatingPaymentRequest?.name !== balance.lastRelatingPaymentRequest?.name
-                        ? ` and ${getUserDisplayName(balance.moneyReceiver)} still ows you for ${
-                              otherWayBalance.lastRelatingPaymentRequest?.name ?? "an unknown reason"
-                          }`
-                        : ""),
-            })
+            "should send money to",
+            balance.moneyReceiver.email,
+            "=",
+            owsAmount,
+            process.env.NODE_ENV === "development" ? paymentLink : ""
         );
+
+        try {
+            await sendMail(
+                balance.moneyHolder.email,
+                `You still owe ${getUserDisplayName(balance.moneyReceiver)} money, pay up!`,
+                getEmailHtml(emailTemplateString, {
+                    paymentLink,
+                    userName: getUserDisplayName(balance.moneyHolder),
+                    paidByUserName: getUserDisplayName(balance.moneyReceiver),
+                    paidByEmail: balance.moneyReceiver.email,
+                    description:
+                        (balance.lastRelatingPaymentRequest?.name ?? "an unknown reason") +
+                        (otherWayBalance && otherWayBalance.lastRelatingPaymentRequest?.name !== balance.lastRelatingPaymentRequest?.name
+                            ? ` and ${getUserDisplayName(balance.moneyReceiver)} still ows you for ${
+                                  otherWayBalance.lastRelatingPaymentRequest?.name ?? "an unknown reason"
+                              }`
+                            : ""),
+                })
+            );
+        } catch (ex) {
+            console.error("Could not send mail to", balance.moneyHolder.email, ex);
+        }
     }
 }
 
@@ -176,8 +190,5 @@ async function sendMail(receiver: string, subject: string, body: string) {
             },
             Source: AWS_SES_SOURCE!,
         })
-        .promise()
-        .then((e) => {
-            console.log("Sent mail to", receiver);
-        });
+        .promise();
 }
