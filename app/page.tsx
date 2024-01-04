@@ -23,6 +23,12 @@ export default function Home() {
             <AppText />
 
             <Skeleton isLoaded={status === "unauthenticated"}>
+                <Text textAlign="center" style={{ opacity: "0.5" }}>
+                    Automatically get paid and reminded about payments.
+                </Text>
+            </Skeleton>
+
+            <Skeleton isLoaded={status === "unauthenticated"}>
                 <Button size="lg" colorScheme="orange" rightIcon={<FontAwesomeIcon icon={faArrowRight} />} onClick={() => signIn("google")}>
                     Create Payment Request
                 </Button>

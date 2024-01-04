@@ -413,8 +413,15 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                         )}
                     <Skeleton isLoaded={request && searchResults && userQuery === activeUserQuery}>
                         <Text as="p" opacity={0.5}>
-                            {filteredSearchResults.length === 0 ? "No results" : userQuery ? "Search results" : "Recommended users"}
+                            {filteredSearchResults.length === 0
+                                ? userQuery
+                                    ? "No results"
+                                    : ""
+                                : userQuery
+                                ? "Search results"
+                                : "Recommended users"}
                         </Text>
+
                         <UnorderedList ml={0}>
                             {filteredSearchResults.map((u) => (
                                 <ListItem my={1} display="flex" key={u.id} alignItems="center" gap={2}>
@@ -651,25 +658,34 @@ function ManualPaymentModal(props: { isOpen: boolean; onClose: () => void; money
                     }}>
                     <ModalBody display="flex" flexDir="column" gap={4}>
                         <FormControl isDisabled={submitting}>
-                            <FormLabel>Select what applies</FormLabel>
+                            <FormLabel>
+                                Select what applies to{" "}
+                                <Avatar
+                                    mx={1}
+                                    size="xs"
+                                    name={getUserDisplayName(props.moneyHolder)}
+                                    src={props.moneyHolder.avatarUrl || undefined}
+                                />{" "}
+                                {getUserDisplayName(props.moneyHolder)}
+                            </FormLabel>
                             <Flex flexDir="column" gap={2}>
                                 <Button
                                     isDisabled={submitting}
                                     type="button"
                                     variant={direction === true ? "outline" : "solid"}
                                     onClick={() => setDirection(true)}
-                                    colorScheme="blue"
+                                    colorScheme="green"
                                     leftIcon={<FontAwesomeIcon icon={faHandshake} />}>
-                                    I received money from {getUserDisplayName(props.moneyHolder)}
+                                    I received money
                                 </Button>
                                 <Button
                                     isDisabled={submitting}
                                     type="button"
                                     variant={direction === false ? "outline" : "solid"}
                                     onClick={() => setDirection(false)}
-                                    colorScheme="blue"
+                                    colorScheme="red"
                                     leftIcon={<FontAwesomeIcon icon={faHandHoldingDollar} />}>
-                                    {getUserDisplayName(props.moneyHolder)} received money from me
+                                    I sent money
                                 </Button>
                             </Flex>
                         </FormControl>
