@@ -14,7 +14,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const body = (await request.json()) as { amount: number; moneyHolderId: number };
 
     if (typeof body.amount !== "number") {
-        return NextResponse.json(undefined, { status: 400 });
+        return NextResponse.json(null, { status: 400 });
     }
 
     await prisma.relativeUserBalance.updateMany({

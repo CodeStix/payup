@@ -57,6 +57,7 @@ import {
     ModalFooter,
     ModalHeader,
     ModalOverlay,
+    ButtonGroup,
 } from "@chakra-ui/react";
 import {
     faArrowRight,
@@ -68,6 +69,8 @@ import {
     faClipboardCheck,
     faCoins,
     faCopy,
+    faHandHoldingDollar,
+    faHandshake,
     faHourglass,
     faLink,
     faMoneyBill,
@@ -113,6 +116,7 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
     const { isOpen: paymentLinkIsOpen, onOpen: paymentLinkOnOpen, onClose: paymentLinkOnClose } = useDisclosure();
     const { isOpen: manualPaymentIsOpen, onOpen: manualPaymentOnOpen, onClose: manualPaymentOnClose } = useDisclosure();
     const [generatedPaymentLink, setGeneratedPaymentLink] = useState("");
+    const [manualPaymentMoneyHolder, setManualPaymentMoneyHolder] = useState<User>();
     // const [showOpenPaymentLinkButton, setShowOpenPaymentLinkButton] = useState(false);
 
     const totalParts = useMemo(() => {
@@ -443,7 +447,10 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                                     <Spacer />
 
                                     <PaymentStatusButton
-                                        onManualPayment={() => {}}
+                                        onManualPayment={() => {
+                                            setManualPaymentMoneyHolder(e.user);
+                                            manualPaymentOnOpen();
+                                        }}
                                         onPaymentLink={async (otherWay, instant) => {
                                             let link;
                                             if (otherWay) {
@@ -563,28 +570,129 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                 </Box>
             </Flex>
 
-            {/* 
-            <Modal isOpen={isOpen} onClose={onClose}>
-                <ModalOverlay />
-                <ModalContent>
-                    <ModalHeader>Modal Title</ModalHeader>
-                    <ModalCloseButton />
-                    <ModalBody>
-                        <Lorem count={2} />
-                    </ModalBody>
-
-                    <ModalFooter>
-                        <Button colorScheme="blue" mr={3} onClick={onClose}>
-                            Close
-                        </Button>
-                        <Button variant="ghost">Secondary Action</Button>
-                    </ModalFooter>
-                </ModalContent>
-            </Modal> */}
             {generatedPaymentLink && (
                 <PaymentLinkModal showOpenButton={false} isOpen={paymentLinkIsOpen} onClose={paymentLinkOnClose} paymentLink={generatedPaymentLink} />
             )}
+            {manualPaymentMoneyHolder && (
+                <ManualPaymentModal
+                    isOpen={manualPaymentIsOpen}
+                    onClose={manualPaymentOnClose}
+                    moneyHolder={manualPaymentMoneyHolder}
+                    onSubmit={() => {
+                        void mutateRequest();
+                        manualPaymentOnClose();
+                    }}
+                />
+            )}
         </Flex>
+    );
+}
+
+function ManualPaymentModal(props: { isOpen: boolean; onClose: () => void; moneyHolder: User; onSubmit: () => void }) {
+    const [direction, setDirection] = useState<null | boolean>(null);
+    const [amount, setAmount] = useState("0");
+    const [submitting, setSubmitting] = useState(false);
+
+    async function submit() {
+        setSubmitting(true);
+        try {
+            const res = await fetch("/api/balance", {
+                method: "PATCH",
+                body: JSON.stringify({
+                    amount: direction ? -parseFloat(amount) : parseFloat(amount),
+                    moneyHolderId: props.moneyHolder.id,
+                }),
+            });
+            if (res.ok) {
+                props.onSubmit();
+            }
+        } finally {
+            setSubmitting(false);
+        }
+    }
+
+    return (
+        <Modal isOpen={props.isOpen} onClose={props.onClose}>
+            <ModalOverlay />
+            <ModalContent>
+                <ModalHeader>Add manual payment</ModalHeader>
+                <ModalCloseButton />
+                <form
+                    onSubmit={(ev) => {
+                        ev.preventDefault();
+                        if (!(parseFloat(amount) > 0.01)) {
+                            return;
+                        }
+                        void submit();
+                    }}>
+                    <ModalBody display="flex" flexDir="column" gap={4}>
+                        <FormControl isDisabled={submitting}>
+                            <FormLabel>Select what applies</FormLabel>
+                            <Flex flexDir="column" gap={2}>
+                                <Button
+                                    isDisabled={submitting}
+                                    type="button"
+                                    variant={direction === true ? "outline" : "solid"}
+                                    onClick={() => setDirection(true)}
+                                    colorScheme="blue"
+                                    leftIcon={<FontAwesomeIcon icon={faHandshake} />}>
+                                    I received money from {getUserDisplayName(props.moneyHolder)}
+                                </Button>
+                                <Button
+                                    isDisabled={submitting}
+                                    type="button"
+                                    variant={direction === false ? "outline" : "solid"}
+                                    onClick={() => setDirection(false)}
+                                    colorScheme="blue"
+                                    leftIcon={<FontAwesomeIcon icon={faHandHoldingDollar} />}>
+                                    {getUserDisplayName(props.moneyHolder)} received money from me
+                                </Button>
+                            </Flex>
+                        </FormControl>
+
+                        {direction !== null && (
+                            <FormControl isDisabled={submitting}>
+                                <FormLabel>Amount {direction ? "received" : "sent"}</FormLabel>
+                                <NumberInput
+                                    onBlur={(ev) => {
+                                        setAmount(ev.target.value);
+                                    }}
+                                    autoFocus
+                                    value={amount}
+                                    onChange={(ev) => setAmount(ev)}
+                                    max={100000}
+                                    min={1}>
+                                    <InputGroup>
+                                        <InputLeftAddon>€</InputLeftAddon>
+                                        <NumberInputField borderLeftRadius={0} />
+                                    </InputGroup>
+                                    <NumberInputStepper>
+                                        <NumberIncrementStepper />
+                                        <NumberDecrementStepper />
+                                    </NumberInputStepper>
+                                </NumberInput>
+
+                                {/* <FormHelperText>Paid by you. This amount will be divided over your friends.</FormHelperText> */}
+                            </FormControl>
+                        )}
+                    </ModalBody>
+
+                    <ModalFooter>
+                        <Button variant="ghost" colorScheme="blue" mr={3} onClick={props.onClose} type="button">
+                            Close
+                        </Button>
+                        <Button
+                            isLoading={submitting}
+                            leftIcon={<FontAwesomeIcon icon={faCoins} />}
+                            isDisabled={submitting || !(parseFloat(amount) > 0.01)}
+                            colorScheme="green"
+                            type="submit">
+                            Add manual payment
+                        </Button>
+                    </ModalFooter>
+                </form>
+            </ModalContent>
+        </Modal>
     );
 }
 
@@ -715,15 +823,17 @@ function PaymentStatusButton(props: {
                         <></>
                     )}
 
-                    <Button
-                        isDisabled={props.isDisabled || props.request.paidBy.email !== sessionData?.user?.email}
-                        variant="ghost"
-                        onClick={props.onManualPayment}
-                        colorScheme="blue"
-                        size="sm"
-                        leftIcon={<FontAwesomeIcon icon={faMoneyBill} />}>
-                        Add manual payment
-                    </Button>
+                    {sessionData?.user?.email === props.request.paidBy.email && (
+                        <Button
+                            isDisabled={props.isDisabled || props.request.paidBy.email !== sessionData?.user?.email}
+                            variant="ghost"
+                            onClick={props.onManualPayment}
+                            colorScheme="blue"
+                            size="sm"
+                            leftIcon={<FontAwesomeIcon icon={faMoneyBill} />}>
+                            Add manual payment
+                        </Button>
+                    )}
                 </PopoverBody>
                 {lastPaymentDate && (
                     <PopoverFooter>
