@@ -3,7 +3,7 @@
 import { AppHeader } from "@/components/AppHeader";
 import { EditableControls } from "@/components/EditableControls";
 import { LogOutButton } from "@/components/LogOutButton";
-import { fetcher, removeEmailDomain } from "@/util";
+import { fetcher, getUserDisplayName, removeEmailDomain } from "@/util";
 import {
     Flex,
     Heading,
@@ -69,7 +69,7 @@ import {
     faWarning,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { PaymentRequest, User } from "@prisma/client";
+import { PaymentRequest, PaymentRequestToUser, RelativeUserBalance, User } from "@prisma/client";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -88,7 +88,7 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
         data: request,
         isLoading: requestIsLoading,
         mutate: mutateRequest,
-    } = useSWR<PaymentRequest & { usersToPay: { user: User; partsOfAmount: number }[] }>("/api/request/" + params.id, fetcher);
+    } = useSWR<PaymentRequest & { usersToPay: { user: User; partsOfAmount: number }[]; paidBy: User }>("/api/request/" + params.id, fetcher);
     const { data: searchResults, isLoading: searchResultsAreLoading } = useSWR<User[]>(
         "/api/user/search?query=" + encodeURIComponent(activeUserQuery),
         fetcher
@@ -126,7 +126,7 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
         };
     }, [userQuery]);
 
-    async function patch(n: Partial<PaymentRequest & { usersToPay: { user: { id: number }; partsOfAmount: number; payedAmount?: number }[] }>) {
+    async function patch(n: Partial<PaymentRequest & { usersToPay: { user: { id: number }; partsOfAmount: number }[] }>) {
         setUpdating(true);
         try {
             const res = await fetch(`/api/request/${params.id}`, {
@@ -179,7 +179,7 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
         }
     }
 
-    async function bindUser(user: User, partsOfAmount: number = 1, payedAmount?: number) {
+    async function bindUser(user: User, partsOfAmount: number = 1) {
         if (!request) {
             console.error("Cannot bindUser, not loaded");
             return;
@@ -187,10 +187,7 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
         setUpdating(true);
         try {
             await patch({
-                usersToPay: [
-                    ...request.usersToPay.filter((e) => e.user.id !== user.id),
-                    { user: user, partsOfAmount: partsOfAmount, payedAmount: payedAmount },
-                ],
+                usersToPay: [...request.usersToPay.filter((e) => e.user.id !== user.id), { user: user, partsOfAmount: partsOfAmount }],
             });
         } finally {
             setUpdating(false);
@@ -516,34 +513,55 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
 }
 
 function PaymentStatusButton(props: {
-    userToPay: { partsOfAmount: number; payedAmount: number; lastPaymentDate: number };
+    // paidBy: User;
+    userToPay: PaymentRequestToUser & {
+        user: User & { relativeBalanceFirstUsers: RelativeUserBalance[]; relativeBalanceSecondUsers: RelativeUserBalance[] };
+    };
     totalParts: number;
-    request: PaymentRequest;
+    request: PaymentRequest & { paidBy: User };
     isDisabled: boolean;
     onMarkPaid: (payedAmount: number) => void;
 }) {
-    const shouldPay = (props.userToPay.partsOfAmount / props.totalParts) * props.request.amount;
-    const paid = Math.abs(shouldPay - props.userToPay.payedAmount) < 0.01;
-    const paidLess = props.userToPay.payedAmount > 0 && props.userToPay.payedAmount - shouldPay < -0.01;
-    const paidTooMuch = props.userToPay.payedAmount - shouldPay > 0.01;
+    const relativeBalance =
+        props.userToPay.user.relativeBalanceFirstUsers.length > 0
+            ? props.userToPay.user.relativeBalanceFirstUsers[0]
+            : props.userToPay.user.relativeBalanceSecondUsers.length > 0
+            ? {
+                  amount: -props.userToPay.user.relativeBalanceSecondUsers[0].amount,
+                  lastPaymentDate: props.userToPay.user.relativeBalanceSecondUsers[0].lastPaymentDate,
+              }
+            : { amount: 0, lastPaymentDate: null };
 
     return (
         <Popover>
             <PopoverTrigger>
                 <IconButton
-                    colorScheme={paidLess ? "red" : paid || paidTooMuch ? "green" : "blue"}
+                    colorScheme={relativeBalance.amount === 0 ? "green" : relativeBalance.amount > 0 ? "red" : "blue"}
                     size="xs"
                     rounded={"full"}
                     variant="solid"
                     aria-label="Payment status"
-                    icon={<FontAwesomeIcon icon={paidLess ? faWarning : paidTooMuch ? faWarning : paid ? faCheck : faHourglass} />}
+                    icon={<FontAwesomeIcon icon={relativeBalance.amount === 0 ? faCheck : relativeBalance.amount > 0 ? faWarning : faHourglass} />}
                 />
             </PopoverTrigger>
             <PopoverContent pr={4} w="400px">
                 <PopoverArrow />
                 <PopoverCloseButton />
                 <PopoverHeader>
-                    Payment status:{" "}
+                    {relativeBalance.amount === 0 ? (
+                        <>
+                            {getUserDisplayName(props.request.paidBy)} and {getUserDisplayName(props.userToPay.user)} are even
+                        </>
+                    ) : relativeBalance.amount > 0 ? (
+                        <>
+                            {getUserDisplayName(props.userToPay.user)} still ows {getUserDisplayName(props.request.paidBy)} €{relativeBalance.amount}
+                        </>
+                    ) : (
+                        <>
+                            {getUserDisplayName(props.request.paidBy)} ows {getUserDisplayName(props.userToPay.user)} €{-relativeBalance.amount} back
+                        </>
+                    )}
+                    {/* Payment status:{" "}
                     {paidLess ? (
                         <Text as="span" fontWeight="semibold" color="red.500">
                             <FontAwesomeIcon icon={faWarning} /> Didn&apos;t pay enough
@@ -560,10 +578,10 @@ function PaymentStatusButton(props: {
                         <Text as="span" fontWeight="semibold">
                             Waiting for payment
                         </Text>
-                    )}
+                    )} */}
                 </PopoverHeader>
                 <PopoverBody display="flex" gap={2} flexDir="column">
-                    {paidTooMuch && (
+                    {/* {paidTooMuch && (
                         <Text as="p" opacity={0.5}>
                             But don&apos;t worry, you will be notified automatically when you should pay it back.
                         </Text>
@@ -594,15 +612,15 @@ function PaymentStatusButton(props: {
                             leftIcon={<FontAwesomeIcon icon={faCheckCircle} />}>
                             Mark as fully paid
                         </Button>
-                    )}
+                    )} */}
                 </PopoverBody>
                 <PopoverFooter>
                     <Text as="p" opacity={0.5} fontSize="xs">
-                        {props.userToPay.lastPaymentDate && (
+                        {relativeBalance.lastPaymentDate && (
                             <>
                                 Last payment at{" "}
                                 <Text fontWeight="normal" as="span">
-                                    {new Date(props.userToPay.lastPaymentDate).toLocaleString()}
+                                    {new Date(relativeBalance.lastPaymentDate).toLocaleString()}
                                 </Text>
                             </>
                         )}

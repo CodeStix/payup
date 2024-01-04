@@ -31,6 +31,9 @@ model User {
 
   receivedLinks PaymentLink[] @relation("receivingLinkUser")
   sentLinks     PaymentLink[] @relation("sendingLinkUser")
+
+  relativeBalanceFirstUsers  RelativeUserBalance[] @relation("relativeBalanceFirstUser")
+  relativeBalanceSecondUsers RelativeUserBalance[] @relation("relativeBalanceSecondUser")
 }
 
 model UserToUser {
@@ -52,11 +55,6 @@ model PaymentRequestToUser {
 
   createdDate DateTime @default(now())
 
-  paymentComplete      Boolean   @default(false)
-  lastNotificationDate DateTime?
-  payedAmount          Float     @default(0)
-  lastPaymentDate      DateTime?
-
   @@id([userId, paymentRequestId])
 }
 
@@ -73,6 +71,19 @@ model PaymentRequest {
 
   owner   User @relation(fields: [ownerId], references: [id], name: "owner")
   ownerId Int
+}
+
+model RelativeUserBalance {
+  firstUser    User @relation(fields: [firstUserId], references: [id], name: "relativeBalanceFirstUser")
+  firstUserId  Int
+  secondUser   User @relation(fields: [secondUserId], references: [id], name: "relativeBalanceSecondUser")
+  secondUserId Int
+
+  amount               Float     @default(0)
+  lastPaymentDate      DateTime?
+  lastNotificationDate DateTime?
+
+  @@id([firstUserId, secondUserId])
 }
 
 model PaymentLink {

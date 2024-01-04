@@ -18,6 +18,18 @@ import {
     Avatar,
     Spacer,
     AvatarBadge,
+    Modal,
+    ModalBody,
+    ModalCloseButton,
+    ModalContent,
+    ModalFooter,
+    ModalHeader,
+    ModalOverlay,
+    FormControl,
+    FormErrorMessage,
+    FormHelperText,
+    FormLabel,
+    Input,
 } from "@chakra-ui/react";
 import type { PaymentRequest, User } from "@prisma/client";
 import { faArrowRight, faCheck, faPlus, faTimes } from "@fortawesome/free-solid-svg-icons";
@@ -28,6 +40,7 @@ import { useRouter } from "next/navigation";
 import { LogOutButton } from "@/components/LogOutButton";
 import { AppHeader } from "@/components/AppHeader";
 import { useEffect, useState } from "react";
+import { isError } from "util";
 
 function getUserPayed(request: PaymentRequest & { usersToPay: { user: User; payedAmount: number; partsOfAmount: number }[] }, userId: number) {
     let totalParts = 0;
@@ -37,6 +50,64 @@ function getUserPayed(request: PaymentRequest & { usersToPay: { user: User; paye
     if (!user) return false;
 
     return user.payedAmount >= (user.partsOfAmount / totalParts) * request.amount;
+}
+
+function UserSettingsModal(props: { isOpen: boolean; onClose: () => void }) {
+    // const { isOpen, onOpen, onClose } = useDisclosure()
+    const { data: user } = useSWR<User>("/api/user", fetcher);
+    const [iban, setIban] = useState("");
+    const [mollieApiKey, setMollieApiKey] = useState("");
+
+    useEffect(() => {
+        if (typeof user?.iban === "string") {
+            setIban(user.iban);
+        }
+    }, [user?.iban]);
+
+    useEffect(() => {
+        if (typeof user?.mollieApiKey === "string") {
+            setMollieApiKey(user.mollieApiKey);
+        }
+    }, [user?.mollieApiKey]);
+
+    return (
+        <Modal isOpen={props.isOpen} onClose={props.onClose}>
+            <ModalOverlay />
+            <ModalContent>
+                <ModalHeader>Settings</ModalHeader>
+                <ModalCloseButton />
+                <form
+                    onSubmit={(ev) => {
+                        ev.preventDefault();
+
+                        props.onClose();
+                    }}>
+                    <ModalBody>
+                        <FormControl isInvalid={false}>
+                            <FormLabel>IBAN</FormLabel>
+                            <Input type="text" value={iban} onChange={(ev) => setIban(ev.target.value)} />
+                            <FormHelperText>
+                                This is required if you want to accept payments via your banking number. People can only send money to this address.
+                            </FormHelperText>
+                            {/* {!isError ? (
+                            ) : (
+                                <FormErrorMessage>Email is required.</FormErrorMessage>
+                            )} */}
+                        </FormControl>
+                    </ModalBody>
+
+                    <ModalFooter>
+                        <Button type="button" colorScheme="blue" mr={3} onClick={props.onClose}>
+                            Close
+                        </Button>
+                        <Button type="submit" variant="ghost">
+                            Save changes
+                        </Button>
+                    </ModalFooter>
+                </form>
+            </ModalContent>
+        </Modal>
+    );
 }
 
 export default function HomePage() {

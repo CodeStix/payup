@@ -27,6 +27,7 @@
     "aws-sdk": "^2.1528.0",
     "framer-motion": "^10.16.16",
     "html-to-text": "^9.0.5",
+    "iban": "^0.0.14",
     "jsonwebtoken": "^9.0.2",
     "next": "14.0.4",
     "next-auth": "^4.24.5",
@@ -36,6 +37,7 @@
   },
   "devDependencies": {
     "@types/html-to-text": "^9.0.4",
+    "@types/iban": "^0.0.35",
     "@types/jsonwebtoken": "^9.0.5",
     "@types/node": "^20",
     "@types/react": "^18",
