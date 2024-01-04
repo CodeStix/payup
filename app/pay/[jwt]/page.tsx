@@ -131,12 +131,14 @@ export default function Home({ params }: { params: { jwt: string } }) {
             <Skeleton isLoaded={!!link} minW="300px" textAlign="center">
                 {link?.balance.lastRelatingPaymentRequest && <>For {link.balance.lastRelatingPaymentRequest.name}.</>}
 
-                {link?.otherWayBalance?.lastRelatingPaymentRequest && (
-                    <>
-                        (This includes the money that {getUserDisplayName(link.balance.moneyReceiver)} stills ows you for{" "}
-                        {link.otherWayBalance.lastRelatingPaymentRequest.name})
-                    </>
-                )}
+                {link?.otherWayBalance?.lastRelatingPaymentRequest &&
+                    link.otherWayBalance.lastRelatingPaymentRequest.name !== link.balance.lastRelatingPaymentRequest?.name && (
+                        <>
+                            {" "}
+                            (This includes the money that {getUserDisplayName(link.balance.moneyReceiver)} stills ows you for{" "}
+                            {link.otherWayBalance.lastRelatingPaymentRequest.name})
+                        </>
+                    )}
             </Skeleton>
 
             {/* && (!lastPaymentDate || new Date().getTime() - new Date(lastPaymentDate).getTime() > 60 * 1000) */}
@@ -198,8 +200,8 @@ export default function Home({ params }: { params: { jwt: string } }) {
                     ) : (
                         <>
                             Open your banking app and send €{amount?.toFixed(2) ?? 0} to {link && getUserDisplayName(link.balance.moneyReceiver)} (
-                            {link?.balance.moneyReceiver.iban}). You can close this page if you already paid it, you won&apos;t be notified again.
-                            This link detects if you paid or not.
+                            {link?.balance.moneyReceiver.iban}). This link detects if you paid or not.
+                            {/* You can close this page if you already paid it, you won&apos;t be notified again. */}
                         </>
                     )}
                 </Text>

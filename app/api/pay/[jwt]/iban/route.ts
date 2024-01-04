@@ -51,6 +51,7 @@ export async function POST(request: NextRequest, { params }: { params: { jwt: st
             },
         },
         data: {
+            lastPaymentDate: new Date(),
             amount: {
                 set: 0,
             },

@@ -72,7 +72,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
         },
     });
 
-    console.log("payment request", paymentRequest);
+    // console.log("payment request", paymentRequest);
 
     return NextResponse.json(paymentRequest);
 }
@@ -155,50 +155,50 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     );
     const bodyTotalParts = getTotalParts((body.usersToPay ?? existingRequest.usersToPay) as { partsOfAmount: number }[]);
 
-    console.log("existingUsersToPay", Array.from(existingUsersToPay.values()));
-    console.log("bodyUsersToPay", Array.from(bodyUsersToPay.values()));
+    // console.log("existingUsersToPay", Array.from(existingUsersToPay.values()));
+    // console.log("bodyUsersToPay", Array.from(bodyUsersToPay.values()));
 
     for (const [bodyUserToPayId, bodyUserToPay] of Array.from(bodyUsersToPay.entries())) {
-        console.log(
-            "calculateUserAmount(bodyTotalParts, body.amount, bodyUserToPay.partsOfAmount!)",
-            bodyTotalParts,
-            body.amount,
-            bodyUserToPay.partsOfAmount!
-        );
+        // console.log(
+        //     "calculateUserAmount(bodyTotalParts, body.amount, bodyUserToPay.partsOfAmount!)",
+        //     bodyTotalParts,
+        //     body.amount,
+        //     bodyUserToPay.partsOfAmount!
+        // );
         const bodyAmount = calculateUserAmount(bodyTotalParts, body.amount ?? existingRequest.amount, bodyUserToPay.partsOfAmount!);
 
         const existingUserToPay = existingUsersToPay.get(bodyUserToPayId);
         if (existingUserToPay) {
-            console.log(
-                "calculateUserAmount(existingTotalParts, existingRequest.amount, existingUserToPay.partsOfAmount!)",
-                existingTotalParts,
-                existingRequest.amount,
-                existingUserToPay.partsOfAmount
-            );
+            // console.log(
+            //     "calculateUserAmount(existingTotalParts, existingRequest.amount, existingUserToPay.partsOfAmount!)",
+            //     existingTotalParts,
+            //     existingRequest.amount,
+            //     existingUserToPay.partsOfAmount
+            // );
             const existingAmount = calculateUserAmount(existingTotalParts, existingRequest.amount, existingUserToPay.partsOfAmount!);
             const diff = bodyAmount - existingAmount;
             if (diff !== 0) {
                 // Was adjusted
                 prismaOperations.push(
-                    prisma.relativeUserBalance.update({
+                    prisma.relativeUserBalance.upsert({
                         where: {
                             moneyHolderId_moneyReceiverId: {
-                                moneyReceiverId: existingRequest.paidById,
-                                moneyHolderId: bodyUserToPayId,
+                                moneyReceiverId: diff >= 0 ? existingRequest.paidById : bodyUserToPayId,
+                                moneyHolderId: diff >= 0 ? bodyUserToPayId : existingRequest.paidById,
                             },
                         },
-                        data: {
+                        update: {
                             amount: {
-                                increment: diff,
+                                increment: Math.abs(diff),
                             },
                             lastRelatingPaymentRequestId: params.id,
                         },
-                        // create: {
-                        //     moneyReceiverId: existingRequest.paidById,
-                        //     moneyHolderId: bodyUserToPayId,
-                        //     amount: bodyAmount,
-                        //     lastRelatingPaymentRequestId: params.id,
-                        // },
+                        create: {
+                            moneyReceiverId: diff >= 0 ? existingRequest.paidById : bodyUserToPayId,
+                            moneyHolderId: diff >= 0 ? bodyUserToPayId : existingRequest.paidById,
+                            amount: diff >= 0 ? bodyAmount : Math.abs(diff),
+                            lastRelatingPaymentRequestId: params.id,
+                        },
                     })
                 );
             }
@@ -233,12 +233,12 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     for (const [deletedUserToPayId, deletedUserToPay] of Array.from(existingUsersToPay.entries())) {
         // Was removed, remove from balance
-        console.log(
-            "calculateUserAmount(bodyTotalParts, body.amount ?? existingRequest.amount, deletedUserToPay.partsOfAmount!)",
-            bodyTotalParts,
-            body.amount ?? existingRequest.amount,
-            deletedUserToPay.partsOfAmount!
-        );
+        // console.log(
+        //     "calculateUserAmount(bodyTotalParts, body.amount ?? existingRequest.amount, deletedUserToPay.partsOfAmount!)",
+        //     bodyTotalParts,
+        //     body.amount ?? existingRequest.amount,
+        //     deletedUserToPay.partsOfAmount!
+        // );
         const deletedAmountTopay = calculateUserAmount(bodyTotalParts, body.amount ?? existingRequest.amount, deletedUserToPay.partsOfAmount!);
         prismaOperations.push(
             prisma.relativeUserBalance.update({

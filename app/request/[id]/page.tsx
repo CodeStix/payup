@@ -551,7 +551,7 @@ function PaymentStatusButton(props: {
                         </>
                     ) : (
                         <>
-                            {getUserDisplayName(props.request.paidBy)} ows {getUserDisplayName(props.userToPay.user)} €{-amount.toFixed(2)} back
+                            {getUserDisplayName(props.request.paidBy)} still ows {getUserDisplayName(props.userToPay.user)} €{-amount.toFixed(2)} back
                         </>
                     )}
                     {/* Payment status:{" "}

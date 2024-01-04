@@ -68,6 +68,7 @@ export async function GET(request: NextRequest, { params }: { params: { jwt: str
                 amount: {
                     set: 0,
                 },
+                lastPaymentDate: new Date(),
                 currentMolliePaymentId: null,
             },
         });
