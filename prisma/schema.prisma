@@ -56,11 +56,12 @@ model PaymentRequestToUser {
 }
 
 model PaymentRequest {
-  id          String   @id @default(uuid())
-  name        String
-  description String
-  createdDate DateTime @default(now())
-  amount      Float    @default(0)
+  id             String   @id @default(uuid())
+  name           String
+  description    String
+  createdDate    DateTime @default(now())
+  lastUpdateDate DateTime @default(now())
+  amount         Float    @default(0)
 
   paidBy     User                   @relation(fields: [paidById], references: [id], name: "paid", onDelete: Cascade)
   paidById   Int

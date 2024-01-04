@@ -53,17 +53,33 @@ export function getEmailHtml(template: string, fields: Record<string, string>) {
     return template;
 }
 
-export async function notifyUsers() {
-    // const owingUserPairs = await calculateOwingUsers();
+const NOTIFY_INTERVAL_MS = parseInt(process.env.NOTIFY_INTERVAL_MS || String(1000 * 60 * 60 * 24 * 2));
 
+export async function notifyUsers(all: boolean) {
     const emailTemplateString = await fs.readFile(EMAIL_TEMPLATE_PATH, { encoding: "utf-8" });
 
-    const balances = await prisma.relativeUserBalance.findMany({
-        where: {
-            amount: {
-                not: 0,
-            },
+    const notifyBefore = new Date(new Date().getTime() - NOTIFY_INTERVAL_MS);
+
+    const condition = {
+        amount: {
+            not: 0,
         },
+        ...(all
+            ? {}
+            : {
+                  OR: [
+                      {
+                          lastNotificationDate: {
+                              lt: notifyBefore,
+                          },
+                      },
+                      { lastNotificationDate: null },
+                  ],
+              }),
+    };
+
+    const balances = await prisma.relativeUserBalance.findMany({
+        where: condition,
         select: {
             amount: true,
             moneyHolder: {
@@ -85,6 +101,13 @@ export async function notifyUsers() {
                     name: true,
                 },
             },
+        },
+    });
+
+    await prisma.relativeUserBalance.updateMany({
+        where: condition,
+        data: {
+            lastNotificationDate: new Date(),
         },
     });
 

@@ -6,6 +6,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         return NextResponse.json(null, { status: 404 });
     }
 
-    await notifyUsers();
+    await notifyUsers(request.nextUrl.searchParams.get("all") === "1");
     return NextResponse.json({});
 }
