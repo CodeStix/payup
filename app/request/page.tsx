@@ -110,12 +110,7 @@ function UserSettingsModal(props: { isOpen: boolean; onClose: () => void }) {
 
                         <FormControl isInvalid={"mollieApiKey" in errors} isDisabled={saving || isLoadingUser}>
                             <FormLabel>Mollie API key</FormLabel>
-                            <Input
-                                placeholder="prod_abcdefghi"
-                                type="text"
-                                value={mollieApiKey}
-                                onChange={(ev) => setMollieApiKey(ev.target.value)}
-                            />
+                            <Input placeholder="example: " type="text" value={mollieApiKey} onChange={(ev) => setMollieApiKey(ev.target.value)} />
                             {"mollieApiKey" in errors ? (
                                 <FormErrorMessage>{errors["mollieApiKey"]}</FormErrorMessage>
                             ) : (
@@ -124,7 +119,7 @@ function UserSettingsModal(props: { isOpen: boolean; onClose: () => void }) {
                                     <Link target="_blank" href="https://mollie.com">
                                         mollie
                                     </Link>{" "}
-                                    site to see what's up.
+                                    site to see what&apos;s up.
                                 </FormHelperText>
                             )}
                         </FormControl>

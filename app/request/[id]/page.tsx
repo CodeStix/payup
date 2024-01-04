@@ -810,8 +810,8 @@ function PaymentStatusButton(props: {
 
                     {amount >= 0.01 && (
                         <Text as="p" opacity={0.5}>
-                            {getUserDisplayName(props.userToPay.user, sessionData?.user)} will be notified periodically (weekly) if they haven't paid.
-                            You can also share a payment link by pressing the green button.
+                            {getUserDisplayName(props.userToPay.user, sessionData?.user)} will be notified periodically (weekly) if they haven&apos;t
+                            paid. You can also share a payment link by pressing the green button.
                         </Text>
                     )}
 
