@@ -89,10 +89,10 @@ export default function Home({ params }: { params: { jwt: string } }) {
     }, [link]);
 
     return (
-        <Center style={{ height: "100%", flexDirection: "column", gap: "1em" }}>
+        <Center style={{ height: "100%", flexDirection: "column", gap: "1em" }} p={4}>
             <Heading as="h1">Pay Up!</Heading>
 
-            <Skeleton isLoaded={!!link} minW="400px">
+            <Skeleton isLoaded={!!link}>
                 {link?.paymentMethod === "mollie" ? (
                     <>
                         {paid ? (
@@ -128,7 +128,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
                 )}
             </Skeleton>
 
-            <Skeleton isLoaded={!!link} minW="300px" textAlign="center">
+            <Skeleton isLoaded={!!link} textAlign="center">
                 {link?.balance.lastRelatingPaymentRequest && <>For {link.balance.lastRelatingPaymentRequest.name}.</>}
 
                 {link?.otherWayBalance?.lastRelatingPaymentRequest &&
@@ -143,7 +143,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
 
             {/* && (!lastPaymentDate || new Date().getTime() - new Date(lastPaymentDate).getTime() > 60 * 1000) */}
             {link?.paymentMethod === "iban" && paid && (
-                <Alert status="warning" rounded="lg" maxW="sm" flexDir="column" textAlign="center">
+                <Alert status="warning" rounded="lg" w="xs" flexDir="column" textAlign="center">
                     <Flex>
                         <AlertIcon />
                         <AlertTitle>You already paid?</AlertTitle>
@@ -158,7 +158,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
                         isDisabled={loading || isLoadingLink || paid}
                         isLoading={loading || isLoadingLink}
                         size="lg"
-                        minW="sm"
+                        w="xs"
                         colorScheme="green"
                         rightIcon={<FontAwesomeIcon icon={paid ? faCheckCircle : faArrowRight} />}
                         onClick={() => {
@@ -172,7 +172,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
                         isDisabled={loading || isLoadingLink}
                         isLoading={loading || isLoadingLink}
                         size="lg"
-                        minW="sm"
+                        w="xs"
                         colorScheme="green"
                         leftIcon={<FontAwesomeIcon icon={copied ? faClipboardCheck : faClipboard} />}
                         // rightIcon={<FontAwesomeIcon icon={faArrowRight} />}
@@ -199,8 +199,9 @@ export default function Home({ params }: { params: { jwt: string } }) {
                         </>
                     ) : (
                         <>
-                            Open your banking app and send €{amount?.toFixed(2) ?? 0} to {link && getUserDisplayName(link.balance.moneyReceiver)} (
-                            {link?.balance.moneyReceiver.iban}). This link detects if you paid or not.
+                            Open your banking app and send €{link?.amount?.toFixed(2) ?? 0} to{" "}
+                            {link && getUserDisplayName(link.balance.moneyReceiver)} ({link?.balance.moneyReceiver.iban}). This link detects if you
+                            paid or not.
                             {/* You can close this page if you already paid it, you won&apos;t be notified again. */}
                         </>
                     )}

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { PrismaClient, User } from "@prisma/client";
-import { JwtPayload } from "@/notifications";
+import { JwtPayload, generatePaymentLink } from "@/notifications";
 
 const prisma = new PrismaClient();
 

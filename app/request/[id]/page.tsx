@@ -50,14 +50,25 @@ import {
     AlertDialogHeader,
     AlertDialogOverlay,
     useDisclosure,
+    Modal,
+    ModalBody,
+    ModalCloseButton,
+    ModalContent,
+    ModalFooter,
+    ModalHeader,
+    ModalOverlay,
 } from "@chakra-ui/react";
 import {
+    faArrowRight,
     faCheck,
     faCheckCircle,
     faCheckDouble,
     faChevronLeft,
+    faClipboard,
     faCoins,
+    faCopy,
     faHourglass,
+    faLink,
     faMoneyBill,
     faMoneyBill1Wave,
     faPlus,
@@ -74,6 +85,7 @@ import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
+import QRCode from "react-qr-code";
 
 export default function PaymentRequestDetailPage({ params }: { params: { id: string } }) {
     const router = useRouter();
@@ -97,6 +109,10 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
         () => (searchResults && request ? searchResults.filter((e) => !request.usersToPay.some((f) => f.user.id === e.id)) : []),
         [searchResults, request]
     );
+    const { isOpen: paymentLinkIsOpen, onOpen: paymentLinkOnOpen, onClose: paymentLinkOnClose } = useDisclosure();
+    const { isOpen: manualPaymentIsOpen, onOpen: manualPaymentOnOpen, onClose: manualPaymentOnClose } = useDisclosure();
+    const [generatedPaymentLink, setGeneratedPaymentLink] = useState("");
+    const [showOpenPaymentLinkButton, setShowOpenPaymentLinkButton] = useState(false);
 
     const totalParts = useMemo(() => {
         let parts = 0;
@@ -125,6 +141,26 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
             clearTimeout(i);
         };
     }, [userQuery]);
+
+    async function generatePaymentLink(moneyHolderId: number, moneyReceiverId: number) {
+        setUpdating(true);
+        try {
+            const res = await fetch(`/api/pay`, {
+                method: "POST",
+                body: JSON.stringify({ moneyHolderId, moneyReceiverId }),
+            });
+            if (!res.ok) {
+                console.error(res.status, await res.text());
+                throw new Error("Could not generate payment link");
+            } else {
+                const data = await res.json();
+                setGeneratedPaymentLink(data.paymentLink);
+                paymentLinkOnOpen();
+            }
+        } finally {
+            setUpdating(false);
+        }
+    }
 
     async function patch(n: Partial<PaymentRequest & { usersToPay: { user: { id: number }; partsOfAmount: number }[] }>) {
         setUpdating(true);
@@ -406,8 +442,15 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                                     <Spacer />
 
                                     <PaymentStatusButton
-                                        onMarkPaid={(a) => {
-                                            // void bindUser(e.user, e.partsOfAmount, a);
+                                        onManualPayment={() => {}}
+                                        onPaymentLink={(otherWay) => {
+                                            if (otherWay) {
+                                                setShowOpenPaymentLinkButton(request.paidBy.email === sessionData?.user?.email);
+                                                generatePaymentLink(request.paidBy.id, e.user.id);
+                                            } else {
+                                                setShowOpenPaymentLinkButton(false);
+                                                generatePaymentLink(e.user.id, request.paidBy.id);
+                                            }
                                         }}
                                         isDisabled={isUpdating}
                                         userToPay={e as any}
@@ -508,7 +551,78 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                     </Button> */}
                 </Box>
             </Flex>
+
+            {/* 
+            <Modal isOpen={isOpen} onClose={onClose}>
+                <ModalOverlay />
+                <ModalContent>
+                    <ModalHeader>Modal Title</ModalHeader>
+                    <ModalCloseButton />
+                    <ModalBody>
+                        <Lorem count={2} />
+                    </ModalBody>
+
+                    <ModalFooter>
+                        <Button colorScheme="blue" mr={3} onClick={onClose}>
+                            Close
+                        </Button>
+                        <Button variant="ghost">Secondary Action</Button>
+                    </ModalFooter>
+                </ModalContent>
+            </Modal> */}
+            {generatedPaymentLink && (
+                <PaymentLinkModal
+                    showOpenButton={showOpenPaymentLinkButton}
+                    isOpen={paymentLinkIsOpen}
+                    onClose={paymentLinkOnClose}
+                    paymentLink={generatedPaymentLink}
+                />
+            )}
         </Flex>
+    );
+}
+
+function PaymentLinkModal(props: { isOpen: boolean; onClose: () => void; paymentLink: string; showOpenButton: boolean }) {
+    return (
+        <Modal isOpen={props.isOpen} onClose={props.onClose}>
+            <ModalOverlay />
+            <ModalContent>
+                <ModalHeader>Payment link</ModalHeader>
+                <ModalCloseButton />
+                <ModalBody display="flex" flexDir="column" gap={4}>
+                    {props.showOpenButton && (
+                        <Button
+                            colorScheme="green"
+                            onClick={() => {
+                                window.open(props.paymentLink, "_blank");
+                                props.onClose();
+                            }}
+                            rightIcon={<FontAwesomeIcon icon={faArrowRight} />}>
+                            Pay now
+                        </Button>
+                    )}
+                    <Button
+                        onClick={() => {
+                            void navigator.clipboard.writeText(props.paymentLink);
+                        }}
+                        leftIcon={<FontAwesomeIcon icon={faClipboard} />}>
+                        Copy link to clipboard
+                    </Button>
+                    <QRCode
+                        size={256}
+                        viewBox={`0 0 256 256`}
+                        style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                        value={props.paymentLink}
+                    />
+                </ModalBody>
+
+                <ModalFooter>
+                    <Button colorScheme="blue" mr={3} onClick={props.onClose}>
+                        Close
+                    </Button>
+                </ModalFooter>
+            </ModalContent>
+        </Modal>
     );
 }
 
@@ -520,8 +634,10 @@ function PaymentStatusButton(props: {
     totalParts: number;
     request: PaymentRequest & { paidBy: User };
     isDisabled: boolean;
-    onMarkPaid: (payedAmount: number) => void;
+    onPaymentLink: (otherWay: boolean) => void;
+    onManualPayment: () => void;
 }) {
+    const { status, data: sessionData } = useSession();
     const lastPaymentDate = props.userToPay.user.holdsMoneyFrom[0]?.lastPaymentDate;
     const amount = (props.userToPay.user.holdsMoneyFrom[0]?.amount ?? 0) - (props.userToPay.user.shouldReceiveMoneyFrom[0]?.amount ?? 0);
 
@@ -537,75 +653,57 @@ function PaymentStatusButton(props: {
                     icon={<FontAwesomeIcon icon={amount === 0 ? faCheck : amount > 0 ? faHourglass : faWarning} />}
                 />
             </PopoverTrigger>
-            <PopoverContent pr={4} w="400px">
+            <PopoverContent pr={4} w="300px">
                 <PopoverArrow />
                 <PopoverCloseButton />
-                <PopoverHeader>
-                    {amount === 0 ? (
-                        <>
-                            {getUserDisplayName(props.request.paidBy)} and {getUserDisplayName(props.userToPay.user)} are even
-                        </>
-                    ) : amount > 0 ? (
-                        <>
-                            {getUserDisplayName(props.userToPay.user)} still ows {getUserDisplayName(props.request.paidBy)} €{amount.toFixed(2)}
-                        </>
-                    ) : (
-                        <>
-                            {getUserDisplayName(props.request.paidBy)} still ows {getUserDisplayName(props.userToPay.user)} €{-amount.toFixed(2)} back
-                        </>
-                    )}
-                    {/* Payment status:{" "}
-                    {paidLess ? (
-                        <Text as="span" fontWeight="semibold" color="red.500">
-                            <FontAwesomeIcon icon={faWarning} /> Didn&apos;t pay enough
-                        </Text>
-                    ) : paidTooMuch ? (
-                        <Text as="span" fontWeight="semibold" color="green.500">
-                            <FontAwesomeIcon icon={faWarning} /> Paid too much
-                        </Text>
-                    ) : paid ? (
-                        <Text as="span" fontWeight="semibold" color="green.500">
-                            <FontAwesomeIcon icon={faCheckCircle} /> Paid
-                        </Text>
-                    ) : (
-                        <Text as="span" fontWeight="semibold">
-                            Waiting for payment
-                        </Text>
-                    )} */}
-                </PopoverHeader>
+                <PopoverHeader>Payment status</PopoverHeader>
                 <PopoverBody display="flex" gap={2} flexDir="column">
-                    {/* {paidTooMuch && (
+                    {amount === 0 ? (
+                        <Text as="p" colorScheme="green.500" fontWeight="semibold">
+                            {getUserDisplayName(props.request.paidBy)} and {getUserDisplayName(props.userToPay.user)} are even
+                        </Text>
+                    ) : amount > 0 ? (
+                        <Text as="p" colorScheme="yellow.500" fontWeight="semibold">
+                            {getUserDisplayName(props.userToPay.user)} still ows {getUserDisplayName(props.request.paidBy)} €{amount.toFixed(2)}
+                        </Text>
+                    ) : (
+                        <Text as="p" colorScheme="yellow.500" fontWeight="semibold">
+                            {getUserDisplayName(props.request.paidBy)} still ows {getUserDisplayName(props.userToPay.user)} €{-amount.toFixed(2)} back
+                        </Text>
+                    )}
+
+                    {amount < -0.01 && (
                         <Text as="p" opacity={0.5}>
                             But don&apos;t worry, you will be notified automatically when you should pay it back.
                         </Text>
                     )}
-                    {paidLess && (
+                    {amount > 0.01 && (
                         <Text as="p" opacity={0.5}>
                             But don&apos;t worry, they will be notified automatically when they should pay you again.
                         </Text>
                     )}
 
-                    <Text as="p">
-                        <Text fontWeight="semibold" as="span">
-                            €{props.userToPay.payedAmount.toFixed(2)}
-                        </Text>{" "}
-                        /{" "}
-                        <Text fontWeight="semibold" as="span">
-                            €{shouldPay.toFixed(2)}
-                        </Text>{" "}
-                        paid.{" "}
-                    </Text>
-
-                    {(paidLess || !paid) && (
+                    {Math.abs(amount) > 0.01 && (
                         <Button
+                            variant="solid"
                             isDisabled={props.isDisabled}
-                            onClick={() => props.onMarkPaid(shouldPay)}
+                            onClick={() => props.onPaymentLink(amount < -0.01)}
                             colorScheme="green"
                             size="sm"
-                            leftIcon={<FontAwesomeIcon icon={faCheckCircle} />}>
-                            Mark as fully paid
+                            leftIcon={<FontAwesomeIcon icon={faLink} />}>
+                            Show payment link
                         </Button>
-                    )} */}
+                    )}
+
+                    <Button
+                        isDisabled={props.isDisabled || props.request.paidBy.email !== sessionData?.user?.email}
+                        variant="solid"
+                        onClick={props.onManualPayment}
+                        colorScheme="blue"
+                        size="sm"
+                        leftIcon={<FontAwesomeIcon icon={faMoneyBill} />}>
+                        Add manual payment
+                    </Button>
                 </PopoverBody>
                 <PopoverFooter>
                     <Text as="p" opacity={0.5} fontSize="xs">
