@@ -175,7 +175,7 @@ export default function HomePage() {
 
     return (
         <Flex style={{ height: "100%", justifyContent: "center" }}>
-            <Flex style={{ flexDirection: "column", gap: "2rem", padding: "1rem", width: "400px" }}>
+            <Flex style={{ flexDirection: "column", gap: "1rem", padding: "1rem", width: "400px" }}>
                 <AppHeader />
 
                 <Divider />
@@ -187,7 +187,7 @@ export default function HomePage() {
                             isDisabled={loading}
                             onClick={createNew}
                             width="100%"
-                            colorScheme="green"
+                            colorScheme="orange"
                             leftIcon={<FontAwesomeIcon icon={faPlus} />}>
                             Create new payment request
                         </Button>

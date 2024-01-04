@@ -355,15 +355,6 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                                         min={1}
                                         type="text"></Input>
                                 </InputGroup>
-                                {/* <NumberInput
-                                    >
-                                
-                                    <NumberInputStepper>
-                                        <NumberIncrementStepper />
-                                        <NumberDecrementStepper />
-                                    </NumberInputStepper>
-                                </NumberInput> */}
-
                                 <FormHelperText>Paid by you. This amount will be divided over your friends.</FormHelperText>
                             </FormControl>
                         </form>

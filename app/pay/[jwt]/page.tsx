@@ -10,6 +10,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import Confetti from "react-confetti";
+import { AppText } from "@/components/AppHeader";
 
 export default function Home({ params }: { params: { jwt: string } }) {
     const {
@@ -90,7 +91,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
 
     return (
         <Center style={{ height: "100%", flexDirection: "column", gap: "1em" }} p={4}>
-            <Heading as="h1">Pay Up!</Heading>
+            <AppText />
 
             <Skeleton isLoaded={!!link}>
                 {link?.paymentMethod === "mollie" ? (

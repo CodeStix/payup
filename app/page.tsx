@@ -1,5 +1,6 @@
 "use client";
 
+import { AppText } from "@/components/AppHeader";
 import { Button, Text, Center, Heading, Skeleton } from "@chakra-ui/react";
 import { faArrowRight } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -19,7 +20,7 @@ export default function Home() {
 
     return (
         <Center style={{ height: "100%", flexDirection: "column", gap: "1em" }}>
-            <Heading as="h1">Pay Up!</Heading>
+            <AppText />
 
             <Skeleton isLoaded={status === "unauthenticated"}>
                 <Button size="lg" colorScheme="orange" rightIcon={<FontAwesomeIcon icon={faArrowRight} />} onClick={() => signIn("google")}>
