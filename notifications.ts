@@ -122,7 +122,7 @@ export async function notifyUsers() {
                 paidByEmail: balance.moneyReceiver.email,
                 description:
                     (balance.lastRelatingPaymentRequest?.name ?? "an unknown reason") +
-                    (otherWayBalance
+                    (otherWayBalance && otherWayBalance.lastRelatingPaymentRequest?.name !== balance.lastRelatingPaymentRequest?.name
                         ? ` and ${getUserDisplayName(balance.moneyReceiver)} still ows you for ${
                               otherWayBalance.lastRelatingPaymentRequest?.name ?? "an unknown reason"
                           }`
