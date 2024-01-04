@@ -2,13 +2,14 @@ import { PaymentRequestToUser, PrismaClient, PaymentRequest, PrismaPromise } fro
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/authOptions";
+import { calculateUserAmount, getTotalParts } from "@/util";
 
 const prisma = new PrismaClient();
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }): Promise<NextResponse> {
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
-        return NextResponse.json(undefined, { status: 401 });
+        return NextResponse.json(null, { status: 401 });
     }
 
     let paymentRequest = await prisma.paymentRequest.findUnique({
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     });
 
     if (!paymentRequest) {
-        return NextResponse.json(undefined, { status: 404 });
+        return NextResponse.json(null, { status: 404 });
     }
 
     paymentRequest = await prisma.paymentRequest.findUnique({
@@ -46,18 +47,18 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
                             id: true,
                             userName: true,
                             avatarUrl: true,
-                            relativeBalanceFirstUsers: {
+                            holdsMoneyFrom: {
                                 where: {
-                                    secondUserId: paymentRequest.paidById,
+                                    moneyReceiverId: paymentRequest.paidById,
                                 },
                                 select: {
                                     amount: true,
                                     lastPaymentDate: true,
                                 },
                             },
-                            relativeBalanceSecondUsers: {
+                            shouldReceiveMoneyFrom: {
                                 where: {
-                                    firstUserId: paymentRequest.paidById,
+                                    moneyHolderId: paymentRequest.paidById,
                                 },
                                 select: {
                                     amount: true,
@@ -71,7 +72,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
         },
     });
 
-    return NextResponse.json(paymentRequest, { status: !paymentRequest ? 404 : 200 });
+    console.log("payment request", paymentRequest);
+
+    return NextResponse.json(paymentRequest);
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }): Promise<NextResponse> {
@@ -92,57 +95,6 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     return NextResponse.json({});
 }
 
-function getTotalParts(usersToPay: { partsOfAmount: number }[]) {
-    let parts = 0;
-    usersToPay.forEach((u) => (parts += u.partsOfAmount));
-    return parts;
-}
-
-function calculateUserAmount(totalPaymentRequestParts: number, totalAmount: number, userParts: number) {
-    return (userParts / totalPaymentRequestParts) * totalAmount;
-}
-
-function upsertRelativeBalance(userAId: number, userBId: number, userAToBAmount: number) {
-    console.log("upsertRelativeBalance", userAId, "->", userBId, "+=", userAToBAmount);
-
-    if (userAId === userBId) {
-        console.warn("getRelativeBalance userAId === userBId", userAId, userBId);
-        // return  {lastPayment: 0, amount: 0};
-    }
-
-    let flip = userAId > userBId;
-    return prisma.relativeUserBalance.upsert({
-        where: {
-            firstUserId_secondUserId: {
-                firstUserId: flip ? userBId : userAId,
-                secondUserId: flip ? userAId : userBId,
-            },
-        },
-        create: {
-            firstUser: {
-                connect: {
-                    id: flip ? userBId : userAId,
-                },
-            },
-            secondUser: {
-                connect: {
-                    id: flip ? userAId : userBId,
-                },
-            },
-            // firstUserId: flip ? userBId : userAId,
-            // secondUserId: flip ? userAId : userBId,
-            amount: flip ? -userAToBAmount : userAToBAmount,
-            lastPaymentDate: new Date(),
-        },
-        update: {
-            amount: {
-                increment: flip ? -userAToBAmount : userAToBAmount,
-            },
-            lastPaymentDate: new Date(),
-        },
-    });
-}
-
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }): Promise<NextResponse> {
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
@@ -161,7 +113,6 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                 id: number;
             };
             partsOfAmount?: number;
-            payedAmount?: number;
         }[];
     };
 
@@ -178,6 +129,11 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
             usersToPay: {
                 select: {
                     userId: true,
+                    user: {
+                        select: {
+                            id: true,
+                        },
+                    },
                     partsOfAmount: true,
                 },
             },
@@ -190,55 +146,116 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     let prismaOperations: PrismaPromise<any>[] = [];
 
-    if (body.usersToPay) {
-        // Calculate balance differences between users
-        const existingUsersToPay = new Map<number, Partial<PaymentRequestToUser>>(existingRequest.usersToPay.map((e) => [e.userId, e]));
-        const existingTotalParts = getTotalParts(existingRequest.usersToPay);
+    // Calculate balance differences between users
+    const existingUsersToPay = new Map<number, Partial<PaymentRequestToUser>>(existingRequest.usersToPay.map((e) => [e.userId, e]));
+    const existingTotalParts = getTotalParts(existingRequest.usersToPay);
 
-        const bodyUsersToPay = new Map<number, Partial<PaymentRequestToUser>>(
-            body.usersToPay.map((e) => [e.user.id, { ...existingUsersToPay.get(e.user.id), ...e }])
+    const bodyUsersToPay = new Map<number, Partial<PaymentRequestToUser>>(
+        (body.usersToPay ?? existingRequest.usersToPay).map((e) => [e.user.id, { ...existingUsersToPay.get(e.user.id), ...e }])
+    );
+    const bodyTotalParts = getTotalParts((body.usersToPay ?? existingRequest.usersToPay) as { partsOfAmount: number }[]);
+
+    console.log("existingUsersToPay", Array.from(existingUsersToPay.values()));
+    console.log("bodyUsersToPay", Array.from(bodyUsersToPay.values()));
+
+    for (const [bodyUserToPayId, bodyUserToPay] of Array.from(bodyUsersToPay.entries())) {
+        console.log(
+            "calculateUserAmount(bodyTotalParts, body.amount, bodyUserToPay.partsOfAmount!)",
+            bodyTotalParts,
+            body.amount,
+            bodyUserToPay.partsOfAmount!
         );
-        const bodyTotalParts = getTotalParts(body.usersToPay as { partsOfAmount: number }[]);
+        const bodyAmount = calculateUserAmount(bodyTotalParts, body.amount ?? existingRequest.amount, bodyUserToPay.partsOfAmount!);
 
-        console.log("existingUsersToPay", Array.from(existingUsersToPay.values()));
-        console.log("bodyUsersToPay", Array.from(bodyUsersToPay.values()));
-
-        for (const [bodyUserToPayId, bodyUserToPay] of Array.from(bodyUsersToPay.entries())) {
+        const existingUserToPay = existingUsersToPay.get(bodyUserToPayId);
+        if (existingUserToPay) {
             console.log(
-                "calculateUserAmount(bodyTotalParts, body.amount, bodyUserToPay.partsOfAmount!)",
-                bodyTotalParts,
-                body.amount,
-                bodyUserToPay.partsOfAmount!
+                "calculateUserAmount(existingTotalParts, existingRequest.amount, existingUserToPay.partsOfAmount!)",
+                existingTotalParts,
+                existingRequest.amount,
+                existingUserToPay.partsOfAmount
             );
-            const bodyAmount = calculateUserAmount(bodyTotalParts, body.amount ?? existingRequest.amount, bodyUserToPay.partsOfAmount!);
-
-            const existingUserToPay = existingUsersToPay.get(bodyUserToPayId);
-            if (existingUserToPay) {
-                console.log(
-                    "calculateUserAmount(existingTotalParts, existingRequest.amount, existingUserToPay.partsOfAmount!)",
-                    existingTotalParts,
-                    existingRequest.amount,
-                    existingUserToPay.partsOfAmount
+            const existingAmount = calculateUserAmount(existingTotalParts, existingRequest.amount, existingUserToPay.partsOfAmount!);
+            const diff = bodyAmount - existingAmount;
+            if (diff !== 0) {
+                // Was adjusted
+                prismaOperations.push(
+                    prisma.relativeUserBalance.update({
+                        where: {
+                            moneyHolderId_moneyReceiverId: {
+                                moneyReceiverId: existingRequest.paidById,
+                                moneyHolderId: bodyUserToPayId,
+                            },
+                        },
+                        data: {
+                            amount: {
+                                increment: diff,
+                            },
+                            lastRelatingPaymentRequestId: params.id,
+                        },
+                        // create: {
+                        //     moneyReceiverId: existingRequest.paidById,
+                        //     moneyHolderId: bodyUserToPayId,
+                        //     amount: bodyAmount,
+                        //     lastRelatingPaymentRequestId: params.id,
+                        // },
+                    })
                 );
-                const existingAmount = calculateUserAmount(existingTotalParts, existingRequest.amount, existingUserToPay.partsOfAmount!);
-                const diff = bodyAmount - existingAmount;
-                if (diff !== 0) {
-                    // Was adjusted
-                    prismaOperations.push(upsertRelativeBalance(bodyUserToPayId, existingRequest.paidById, diff));
-                }
-            } else {
-                // New was added
-                prismaOperations.push(upsertRelativeBalance(bodyUserToPayId, existingRequest.paidById, bodyAmount));
             }
-
-            existingUsersToPay.delete(bodyUserToPayId);
+        } else {
+            // New was added
+            prismaOperations.push(
+                prisma.relativeUserBalance.upsert({
+                    where: {
+                        moneyHolderId_moneyReceiverId: {
+                            moneyReceiverId: existingRequest.paidById,
+                            moneyHolderId: bodyUserToPayId,
+                        },
+                    },
+                    update: {
+                        amount: {
+                            increment: bodyAmount,
+                        },
+                        lastRelatingPaymentRequestId: params.id,
+                    },
+                    create: {
+                        moneyReceiverId: existingRequest.paidById,
+                        moneyHolderId: bodyUserToPayId,
+                        amount: bodyAmount,
+                        lastRelatingPaymentRequestId: params.id,
+                    },
+                })
+            );
         }
 
-        for (const [deletedUserToPayId, deletedUserToPay] of Array.from(existingUsersToPay.entries())) {
-            // Was removed, remove from balance
-            const deletedAmountTopay = calculateUserAmount(bodyTotalParts, body.amount ?? existingRequest.amount, deletedUserToPay.partsOfAmount!);
-            prismaOperations.push(upsertRelativeBalance(deletedUserToPayId, existingRequest.paidById, -deletedAmountTopay));
-        }
+        existingUsersToPay.delete(bodyUserToPayId);
+    }
+
+    for (const [deletedUserToPayId, deletedUserToPay] of Array.from(existingUsersToPay.entries())) {
+        // Was removed, remove from balance
+        console.log(
+            "calculateUserAmount(bodyTotalParts, body.amount ?? existingRequest.amount, deletedUserToPay.partsOfAmount!)",
+            bodyTotalParts,
+            body.amount ?? existingRequest.amount,
+            deletedUserToPay.partsOfAmount!
+        );
+        const deletedAmountTopay = calculateUserAmount(bodyTotalParts, body.amount ?? existingRequest.amount, deletedUserToPay.partsOfAmount!);
+        prismaOperations.push(
+            prisma.relativeUserBalance.update({
+                where: {
+                    moneyHolderId_moneyReceiverId: {
+                        moneyReceiverId: existingRequest.paidById,
+                        moneyHolderId: deletedUserToPayId,
+                    },
+                },
+                data: {
+                    amount: {
+                        decrement: deletedAmountTopay,
+                    },
+                    lastRelatingPaymentRequestId: params.id,
+                },
+            })
+        );
     }
 
     if (body.usersToPay) {
@@ -309,18 +326,18 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                                 id: true,
                                 userName: true,
                                 avatarUrl: true,
-                                relativeBalanceFirstUsers: {
+                                holdsMoneyFrom: {
                                     where: {
-                                        secondUserId: existingRequest.paidById,
+                                        moneyReceiverId: existingRequest.paidById,
                                     },
                                     select: {
                                         amount: true,
                                         lastPaymentDate: true,
                                     },
                                 },
-                                relativeBalanceSecondUsers: {
+                                shouldReceiveMoneyFrom: {
                                     where: {
-                                        firstUserId: existingRequest.paidById,
+                                        moneyHolderId: existingRequest.paidById,
                                     },
                                     select: {
                                         amount: true,

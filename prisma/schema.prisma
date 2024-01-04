@@ -29,11 +29,11 @@ model User {
   // This user is related to because they initiated a connected to this user
   responders UserToUser[] @relation("responders")
 
-  receivedLinks PaymentLink[] @relation("receivingLinkUser")
-  sentLinks     PaymentLink[] @relation("sendingLinkUser")
+  // receivedLinks PaymentLink[] @relation("receivingLinkUser")
+  // sentLinks     PaymentLink[] @relation("sendingLinkUser")
 
-  relativeBalanceFirstUsers  RelativeUserBalance[] @relation("relativeBalanceFirstUser")
-  relativeBalanceSecondUsers RelativeUserBalance[] @relation("relativeBalanceSecondUser")
+  holdsMoneyFrom         RelativeUserBalance[] @relation("relativeBalanceMoneyHolder")
+  shouldReceiveMoneyFrom RelativeUserBalance[] @relation("relativeBalanceMoneyReceiver")
 }
 
 model UserToUser {
@@ -71,34 +71,38 @@ model PaymentRequest {
 
   owner   User @relation(fields: [ownerId], references: [id], name: "owner")
   ownerId Int
+
+  relatesToUserBalances RelativeUserBalance[]
 }
 
 model RelativeUserBalance {
-  firstUser    User @relation(fields: [firstUserId], references: [id], name: "relativeBalanceFirstUser")
-  firstUserId  Int
-  secondUser   User @relation(fields: [secondUserId], references: [id], name: "relativeBalanceSecondUser")
-  secondUserId Int
+  moneyHolder     User @relation(fields: [moneyHolderId], references: [id], name: "relativeBalanceMoneyHolder")
+  moneyHolderId   Int
+  moneyReceiver   User @relation(fields: [moneyReceiverId], references: [id], name: "relativeBalanceMoneyReceiver")
+  moneyReceiverId Int
 
-  amount               Float     @default(0)
-  lastPaymentDate      DateTime?
-  lastNotificationDate DateTime?
+  amount                       Float           @default(0)
+  lastPaymentDate              DateTime?
+  lastNotificationDate         DateTime?
+  lastRelatingPaymentRequest   PaymentRequest? @relation(fields: [lastRelatingPaymentRequestId], references: [id])
+  lastRelatingPaymentRequestId String?
 
-  @@id([firstUserId, secondUserId])
+  @@id([moneyHolderId, moneyReceiverId])
 }
 
-model PaymentLink {
-  id                      String    @id @default(uuid())
-  paid                    Boolean
-  paidDate                DateTime?
-  amount                  Float
-  amountPerPaymentRequest Json
-  receivingUser           User      @relation(fields: [receivingUserId], references: [id], name: "receivingLinkUser", onDelete: Cascade)
-  receivingUserId         Int
-  sendingUser             User      @relation(fields: [sendingUserId], references: [id], name: "sendingLinkUser", onDelete: Cascade)
-  sendingUserId           Int
+// model PaymentLink {
+//   id                      String    @id @default(uuid())
+//   paid                    Boolean
+//   paidDate                DateTime?
+//   amount                  Float
+//   amountPerPaymentRequest Json
+//   receivingUser           User      @relation(fields: [receivingUserId], references: [id], name: "receivingLinkUser", onDelete: Cascade)
+//   receivingUserId         Int
+//   sendingUser             User      @relation(fields: [sendingUserId], references: [id], name: "sendingLinkUser", onDelete: Cascade)
+//   sendingUserId           Int
 
-  paymentMethod   String  @default("iban")
-  molliePaymentId String?
+//   paymentMethod   String  @default("iban")
+//   molliePaymentId String?
 
-  createdDate DateTime @default(now())
-}
+//   createdDate DateTime @default(now())
+// }

@@ -1,11 +1,11 @@
 "use client";
 
 import type { PayResponse } from "@/app/api/pay/[jwt]/route";
-import { fetcher, removeEmailDomain } from "@/util";
+import { fetcher, getUserDisplayName, removeEmailDomain } from "@/util";
 import { Button, Text, Center, Heading, Skeleton, AlertTitle, Alert, AlertIcon, Flex, Link } from "@chakra-ui/react";
 import { faArrowRight, faCheckCircle, faClipboard, faClipboardCheck } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { PaymentLink, User } from "@prisma/client";
+import { RelativeUserBalance, User } from "@prisma/client";
 import { signIn, signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -15,15 +15,22 @@ export default function Home({ params }: { params: { jwt: string } }) {
     const router = useRouter();
 
     const {
-        data: paymentLink,
-        isLoading: isLoadingPaymentLink,
-        mutate: mutatePaymentLink,
-    } = useSWR<PaymentLink & { sendingUser: User; receivingUser: User; checkoutUrl?: string; status?: string }>(`/api/pay/${params.jwt}`, fetcher);
+        data: link,
+        isLoading: isLoadingLink,
+        mutate: mutateLink,
+    } = useSWR<{
+        balance: RelativeUserBalance & { lastRelatingPaymentRequest?: { name: string }; moneyHolder: User; moneyReceiver: User };
+        otherWayBalance?: RelativeUserBalance & { lastRelatingPaymentRequest?: { name: string } };
+        paymentMethod: "mollie" | "iban";
+    }>(`/api/pay/${params.jwt}`, fetcher);
 
     const [loading, setLoading] = useState(false);
     const [copied, setCopied] = useState(false);
     const paidRef = useRef(false);
-    const senderDisplayName = paymentLink?.sendingUser.userName || removeEmailDomain(paymentLink?.sendingUser.email ?? "");
+
+    const lastPaymentDate = link?.balance.lastPaymentDate;
+    const amount = !link ? null : link.otherWayBalance ? link.balance.amount - link.otherWayBalance.amount : link.balance.amount;
+    const paid = amount ? amount < 0.01 : false;
 
     async function fetchPay(linkId: string) {
         const prevLoading = loading;
@@ -39,7 +46,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
                     if (!payRes.paid && payRes.status !== "paid") {
                         location.href = payRes.checkoutUrl!;
                     } else {
-                        await mutatePaymentLink();
+                        await mutateLink();
                     }
                 }
             } else {
@@ -51,80 +58,98 @@ export default function Home({ params }: { params: { jwt: string } }) {
     }
 
     useEffect(() => {
-        if (paymentLink) {
-            if (
-                paymentLink.paymentMethod === "iban" ||
-                (paymentLink.paymentMethod === "mollie" && !paymentLink.paid && paymentLink.status === "paid")
-            ) {
+        if (link) {
+            if (link.paymentMethod === "iban") {
                 // Pay automatically
                 if (!paidRef.current) {
                     paidRef.current = true;
-                    void fetchPay(params.jwt);
+                    // void fetchPay(params.jwt);
                 }
             }
         }
-    }, [paymentLink]);
+    }, [link]);
 
     return (
         <Center style={{ height: "100%", flexDirection: "column", gap: "1em" }}>
             <Heading as="h1">Pay Up!</Heading>
 
-            <Skeleton isLoaded={!!paymentLink} minW="400px">
-                {paymentLink?.paymentMethod === "mollie" && paymentLink.paid ? (
-                    <Heading color="green.500" textAlign="center">
-                        You paid €{paymentLink?.amount.toFixed(2)} to {senderDisplayName}.
-                    </Heading>
+            <Skeleton isLoaded={!!link} minW="400px">
+                {link?.paymentMethod === "mollie" ? (
+                    <>
+                        {paid ? (
+                            <Heading color="green.500" textAlign="center">
+                                You already paid {link.balance.moneyReceiver && getUserDisplayName(link.balance.moneyReceiver)}!
+                            </Heading>
+                        ) : (
+                            <Heading as="h2" textAlign="center">
+                                You still owe {link.balance.moneyReceiver && getUserDisplayName(link.balance.moneyReceiver)} €{amount}!
+                            </Heading>
+                        )}
+                    </>
                 ) : (
-                    <Heading as="h2" textAlign="center">
-                        You still owe {senderDisplayName} €{paymentLink?.amount.toFixed(2)}!
-                    </Heading>
+                    <>
+                        {paid ? (
+                            <Heading color="yellow.500" textAlign="center">
+                                You could still be owing €{amount} to {link?.balance.moneyReceiver && getUserDisplayName(link.balance.moneyReceiver)}!
+                            </Heading>
+                        ) : (
+                            <Heading as="h2" textAlign="center">
+                                You still owe {link?.balance.moneyReceiver && getUserDisplayName(link.balance.moneyReceiver)} €{amount}!
+                            </Heading>
+                        )}
+                    </>
                 )}
             </Skeleton>
 
-            <Skeleton isLoaded={!!paymentLink} minW="300px" textAlign="center">
-                For {(paymentLink?.amountPerPaymentRequest as { name: string }[])?.map((e) => e.name).join(", ")}.
+            <Skeleton isLoaded={!!link} minW="300px" textAlign="center">
+                {link?.balance.lastRelatingPaymentRequest && <>For {link.balance.lastRelatingPaymentRequest.name}.</>}
+
+                {link?.otherWayBalance?.lastRelatingPaymentRequest && (
+                    <>
+                        (This includes the money that {getUserDisplayName(link.balance.moneyReceiver)} stills ows you for{" "}
+                        {link.otherWayBalance.lastRelatingPaymentRequest.name})
+                    </>
+                )}
             </Skeleton>
 
-            {paymentLink?.paymentMethod === "iban" &&
-                paymentLink?.paid &&
-                paymentLink.paidDate &&
-                new Date().getTime() - new Date(paymentLink.paidDate).getTime() > 60 * 1000 && (
-                    <Alert status="warning" rounded="lg" maxW="lg" flexDir="column" textAlign="center">
-                        <Flex>
-                            <AlertIcon />
-                            <AlertTitle>You already paid?</AlertTitle>
-                        </Flex>
-                        You already opened this link at {new Date(paymentLink.paidDate).toLocaleString()}.
-                    </Alert>
-                )}
+            {/* && (!lastPaymentDate || new Date().getTime() - new Date(lastPaymentDate).getTime() > 60 * 1000) */}
+            {link?.paymentMethod === "iban" && paid && (
+                <Alert status="warning" rounded="lg" maxW="lg" flexDir="column" textAlign="center">
+                    <Flex>
+                        <AlertIcon />
+                        <AlertTitle>You already paid?</AlertTitle>
+                    </Flex>
+                    You already opened this link {lastPaymentDate && <>at {new Date(lastPaymentDate).toLocaleString()}</>}.
+                </Alert>
+            )}
 
-            <Skeleton isLoaded={!!paymentLink}>
-                {paymentLink?.paymentMethod === "mollie" ? (
+            <Skeleton isLoaded={!!link}>
+                {link?.paymentMethod === "mollie" ? (
                     <Button
-                        isDisabled={loading || isLoadingPaymentLink || paymentLink.paid}
-                        isLoading={loading || isLoadingPaymentLink}
+                        isDisabled={loading || isLoadingLink || paid}
+                        isLoading={loading || isLoadingLink}
                         size="lg"
                         minW="sm"
                         colorScheme="green"
-                        rightIcon={<FontAwesomeIcon icon={paymentLink.paid ? faCheckCircle : faArrowRight} />}
+                        rightIcon={<FontAwesomeIcon icon={paid ? faCheckCircle : faArrowRight} />}
                         onClick={() => {
                             setLoading(true);
-                            void fetchPay(paymentLink.id);
+                            // void fetchPay(link.id);
                         }}>
-                        {paymentLink.paid ? <>You already paid!</> : <>Select your bank</>}
+                        {paid ? <>You already paid!</> : <>Select your bank</>}
                     </Button>
                 ) : (
                     <Button
-                        isDisabled={loading || isLoadingPaymentLink}
-                        isLoading={loading || isLoadingPaymentLink}
+                        isDisabled={loading || isLoadingLink}
+                        isLoading={loading || isLoadingLink}
                         size="lg"
                         minW="sm"
                         colorScheme="green"
                         leftIcon={<FontAwesomeIcon icon={copied ? faClipboardCheck : faClipboard} />}
                         // rightIcon={<FontAwesomeIcon icon={faArrowRight} />}
                         onClick={() => {
-                            if (paymentLink && paymentLink.paymentMethod === "iban") {
-                                void navigator.clipboard.writeText(paymentLink.sendingUser.iban!);
+                            if (link && link.paymentMethod === "iban") {
+                                void navigator.clipboard.writeText(link.balance.moneyReceiver.iban!);
                                 setCopied(true);
                             }
                         }}>
@@ -133,11 +158,11 @@ export default function Home({ params }: { params: { jwt: string } }) {
                 )}
             </Skeleton>
 
-            <Skeleton isLoaded={!!paymentLink}>
+            <Skeleton isLoaded={!!link}>
                 <Text style={{ opacity: "0.5", maxWidth: "500px", textAlign: "center", minHeight: "2rem" }} textAlign="center">
-                    {paymentLink?.paymentMethod === "mollie" ? (
+                    {link?.paymentMethod === "mollie" ? (
                         <>
-                            {senderDisplayName} selected{" "}
+                            {getUserDisplayName(link.balance.moneyReceiver)} selected{" "}
                             <Link target="_blank" href="https://mollie.com">
                                 mollie
                             </Link>{" "}
@@ -145,8 +170,8 @@ export default function Home({ params }: { params: { jwt: string } }) {
                         </>
                     ) : (
                         <>
-                            Open your banking app and send €{paymentLink?.amount.toFixed(2) ?? 0} to {senderDisplayName} (
-                            {paymentLink?.sendingUser.iban}). You can close this page if you already paid it, you won&apos;t be notified again.
+                            Open your banking app and send €{amount?.toFixed(2) ?? 0} to {link && getUserDisplayName(link.balance.moneyReceiver)} (
+                            {link?.balance.moneyReceiver.iban}). You can close this page if you already paid it, you won&apos;t be notified again.
                         </>
                     )}
                 </Text>

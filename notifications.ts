@@ -3,6 +3,7 @@ import AWS from "aws-sdk";
 import jwt from "jsonwebtoken";
 import fs from "fs/promises";
 import { htmlToText } from "html-to-text";
+import { getUserDisplayName } from "./util";
 
 const prisma = new PrismaClient();
 
@@ -20,7 +21,7 @@ AWS.config.update({
 
 let ses = new AWS.SES();
 
-export async function calculateOwingUsers() {
+/*export async function calculateOwingUsers() {
     const payingUserOpenRequests = await prisma.paymentRequestToUser.findMany({
         where: {
             paymentComplete: false,
@@ -146,48 +147,35 @@ export async function calculateOwingUsers() {
     // }
 
     return Array.from(balancePerUserPair.values());
-}
+}*/
 
-// export type JwtPayload = {
-//     method: "iban";
-//     paidBy: Partial<User>;
-//     user: Partial<User>;
-//     amount: number;
-//     // settlesPaymentsRequests
-//     paid: [paymentRequestId: string, amount: number][];
-// };
+export type JwtPayload = {
+    // User id that should receive money
+    r: number;
+    // User id that currently holds their money
+    h: number;
+};
 
-export async function generatePaymentLink(
-    ows: User,
-    paidBy: User,
-    amount: number,
-    paidPaymentsRequests: { paymentRequestId: string; amount: number; userId: number }[]
-) {
-    // const jwtPayload: JwtPayload = {
-    //     method: "iban",
-    //     paidBy: {
-    //         id: paidBy.id,
+export async function generatePaymentLink(holder: number, receiver: number) {
+    const jwtPayload: JwtPayload = {
+        r: receiver,
+        h: holder,
+    };
+
+    // const link = await prisma.paymentLink.create({
+    //     data: {
+    //         amount: amount,
+    //         sendingUserId: paidBy.id,
+    //         receivingUserId: ows.id,
+    //         amountPerPaymentRequest: paidPaymentsRequests,
+    //         paymentMethod: paidBy.mollieApiKey ? "mollie" : "iban",
+    //         paid: false,
     //     },
-    //     user: {
-    //         id: ows.id,
-    //     },
-    //     amount: amount,
-    //     paid: paidPaymentsRequests,
-    // };
+    // });
 
-    const link = await prisma.paymentLink.create({
-        data: {
-            amount: amount,
-            sendingUserId: paidBy.id,
-            receivingUserId: ows.id,
-            amountPerPaymentRequest: paidPaymentsRequests,
-            paymentMethod: paidBy.mollieApiKey ? "mollie" : "iban",
-            paid: false,
-        },
-    });
-
-    // const jwtString = jwt.sign(jwtPayload, JWT_SECRET!, { expiresIn: 60 * 60 * 24 * 30 });
-    return `${SERVER_URL}/pay/${encodeURIComponent(link.id)}`;
+    const jwtString = jwt.sign(jwtPayload, JWT_SECRET!, { expiresIn: 60 * 60 * 24 * 30 });
+    return `${SERVER_URL}/pay/${encodeURIComponent(jwtString)}`;
+    // return `${SERVER_URL}/pay/${encodeURIComponent(link.id)}`;
 }
 
 export function getEmailHtml(template: string, fields: Record<string, string>) {
@@ -199,28 +187,79 @@ export function getEmailHtml(template: string, fields: Record<string, string>) {
 }
 
 export async function notifyUsers() {
-    const owingUserPairs = await calculateOwingUsers();
+    // const owingUserPairs = await calculateOwingUsers();
 
     const emailTemplateString = await fs.readFile(EMAIL_TEMPLATE_PATH, { encoding: "utf-8" });
 
-    for (let userPair of owingUserPairs) {
-        const amount = Math.abs(userPair.amount);
-        const ows = userPair.amount >= 0 ? userPair.ows : userPair.paidBy;
-        const paidBy = userPair.amount >= 0 ? userPair.paidBy : userPair.ows;
+    const balances = await prisma.relativeUserBalance.findMany({
+        where: {
+            amount: {
+                not: 0,
+            },
+        },
+        select: {
+            amount: true,
+            moneyHolder: {
+                select: {
+                    id: true,
+                    email: true,
+                    userName: true,
+                },
+            },
+            moneyReceiver: {
+                select: {
+                    id: true,
+                    email: true,
+                    userName: true,
+                },
+            },
+            lastRelatingPaymentRequest: {
+                select: {
+                    name: true,
+                },
+            },
+        },
+    });
 
-        const paymentLink = await generatePaymentLink(ows, paidBy, amount, userPair.settlesPaymentsRequests);
+    const pairs = new Map<string, (typeof balances)[number]>();
+    for (const balance of balances) {
+        pairs.set(`${balance.moneyHolder.id}->${balance.moneyReceiver.id}`, balance);
+    }
 
-        console.log(ows.email, "ows", paidBy.email, amount, paymentLink);
+    for (const balance of balances) {
+        const otherWayBalance = pairs.get(`${balance.moneyReceiver.id}->${balance.moneyHolder.id}`);
+
+        console.log("bal", balance, otherWayBalance);
+
+        if (balance.amount < 0) {
+            console.warn("A balance is negative", balance);
+        }
+
+        const owsAmount = otherWayBalance ? balance.amount - otherWayBalance.amount : balance.amount;
+        if (owsAmount <= 0) {
+            // Ows the other way around or doesn't owe anything, skip
+            continue;
+        }
+
+        const paymentLink = await generatePaymentLink(balance.moneyHolder.id, balance.moneyReceiver.id);
+
+        console.log(balance.moneyHolder.email, "should send money to", balance.moneyReceiver.email, "=", owsAmount, paymentLink);
 
         await sendMail(
-            ows.email,
-            `You still owe ${paidBy.userName} money, pay up!`,
+            balance.moneyHolder.email,
+            `You still owe ${getUserDisplayName(balance.moneyReceiver)} money, pay up!`,
             getEmailHtml(emailTemplateString, {
                 paymentLink,
-                userName: ows.userName || ows.email,
-                paidByUserName: paidBy.userName || paidBy.email,
-                paidByEmail: paidBy.email,
-                description: userPair.settlesPaymentsRequests.map((e) => e.name).join(", "),
+                userName: getUserDisplayName(balance.moneyHolder),
+                paidByUserName: getUserDisplayName(balance.moneyReceiver),
+                paidByEmail: balance.moneyReceiver.email,
+                description:
+                    (balance.lastRelatingPaymentRequest?.name ?? "an unknown reason") +
+                    (otherWayBalance
+                        ? ` and ${getUserDisplayName(balance.moneyReceiver)} still ows you for ${
+                              otherWayBalance.lastRelatingPaymentRequest?.name ?? "an unknown reason"
+                          }`
+                        : ""),
             })
         );
     }

@@ -407,7 +407,7 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
 
                                     <PaymentStatusButton
                                         onMarkPaid={(a) => {
-                                            void bindUser(e.user, e.partsOfAmount, a);
+                                            // void bindUser(e.user, e.partsOfAmount, a);
                                         }}
                                         isDisabled={isUpdating}
                                         userToPay={e as any}
@@ -515,50 +515,43 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
 function PaymentStatusButton(props: {
     // paidBy: User;
     userToPay: PaymentRequestToUser & {
-        user: User & { relativeBalanceFirstUsers: RelativeUserBalance[]; relativeBalanceSecondUsers: RelativeUserBalance[] };
+        user: User & { holdsMoneyFrom: RelativeUserBalance[]; shouldReceiveMoneyFrom: RelativeUserBalance[] };
     };
     totalParts: number;
     request: PaymentRequest & { paidBy: User };
     isDisabled: boolean;
     onMarkPaid: (payedAmount: number) => void;
 }) {
-    const relativeBalance =
-        props.userToPay.user.relativeBalanceFirstUsers.length > 0
-            ? props.userToPay.user.relativeBalanceFirstUsers[0]
-            : props.userToPay.user.relativeBalanceSecondUsers.length > 0
-            ? {
-                  amount: -props.userToPay.user.relativeBalanceSecondUsers[0].amount,
-                  lastPaymentDate: props.userToPay.user.relativeBalanceSecondUsers[0].lastPaymentDate,
-              }
-            : { amount: 0, lastPaymentDate: null };
+    const lastPaymentDate = props.userToPay.user.holdsMoneyFrom[0]?.lastPaymentDate;
+    const amount = (props.userToPay.user.holdsMoneyFrom[0]?.amount ?? 0) - (props.userToPay.user.shouldReceiveMoneyFrom[0]?.amount ?? 0);
 
     return (
         <Popover>
             <PopoverTrigger>
                 <IconButton
-                    colorScheme={relativeBalance.amount === 0 ? "green" : relativeBalance.amount > 0 ? "red" : "blue"}
+                    colorScheme={amount === 0 ? "green" : amount > 0 ? "blue" : "blue"}
                     size="xs"
                     rounded={"full"}
                     variant="solid"
                     aria-label="Payment status"
-                    icon={<FontAwesomeIcon icon={relativeBalance.amount === 0 ? faCheck : relativeBalance.amount > 0 ? faWarning : faHourglass} />}
+                    icon={<FontAwesomeIcon icon={amount === 0 ? faCheck : amount > 0 ? faHourglass : faWarning} />}
                 />
             </PopoverTrigger>
             <PopoverContent pr={4} w="400px">
                 <PopoverArrow />
                 <PopoverCloseButton />
                 <PopoverHeader>
-                    {relativeBalance.amount === 0 ? (
+                    {amount === 0 ? (
                         <>
                             {getUserDisplayName(props.request.paidBy)} and {getUserDisplayName(props.userToPay.user)} are even
                         </>
-                    ) : relativeBalance.amount > 0 ? (
+                    ) : amount > 0 ? (
                         <>
-                            {getUserDisplayName(props.userToPay.user)} still ows {getUserDisplayName(props.request.paidBy)} €{relativeBalance.amount}
+                            {getUserDisplayName(props.userToPay.user)} still ows {getUserDisplayName(props.request.paidBy)} €{amount.toFixed(2)}
                         </>
                     ) : (
                         <>
-                            {getUserDisplayName(props.request.paidBy)} ows {getUserDisplayName(props.userToPay.user)} €{-relativeBalance.amount} back
+                            {getUserDisplayName(props.request.paidBy)} ows {getUserDisplayName(props.userToPay.user)} €{-amount.toFixed(2)} back
                         </>
                     )}
                     {/* Payment status:{" "}
@@ -616,11 +609,11 @@ function PaymentStatusButton(props: {
                 </PopoverBody>
                 <PopoverFooter>
                     <Text as="p" opacity={0.5} fontSize="xs">
-                        {relativeBalance.lastPaymentDate && (
+                        {lastPaymentDate && (
                             <>
                                 Last payment at{" "}
                                 <Text fontWeight="normal" as="span">
-                                    {new Date(relativeBalance.lastPaymentDate).toLocaleString()}
+                                    {new Date(lastPaymentDate).toLocaleString()}
                                 </Text>
                             </>
                         )}

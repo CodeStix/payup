@@ -57,7 +57,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             amount: true,
             usersToPay: {
                 select: {
-                    payedAmount: true,
                     partsOfAmount: true,
                     user: {
                         select: {

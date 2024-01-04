@@ -1,45 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
-import { PaymentLink, PrismaClient, User } from "@prisma/client";
+import { PrismaClient, User } from "@prisma/client";
 import { getClientForUser } from "@/mollie";
 import { PaymentStatus } from "@mollie/api-client";
+import { JwtPayload } from "@/notifications";
 
 const prisma = new PrismaClient();
 
-async function completeLinkPayment(link: PaymentLink): Promise<PaymentLink> {
-    return await prisma.$transaction(async (prisma) => {
-        for (const { paymentRequestId, amount, userId } of link.amountPerPaymentRequest as {
-            paymentRequestId: string;
-            amount: number;
-            userId: number;
-        }[]) {
-            await prisma.paymentRequestToUser.update({
-                where: {
-                    userId_paymentRequestId: {
-                        userId: userId,
-                        paymentRequestId: paymentRequestId!,
-                    },
-                },
-                data: {
-                    payedAmount: {
-                        increment: amount,
-                    },
-                    lastPaymentDate: new Date(),
-                },
-            });
-        }
+// async function completeLinkPayment(link: PaymentLink): Promise<PaymentLink> {
+//     return await prisma.$transaction(async (prisma) => {
+//         for (const { paymentRequestId, amount, userId } of link.amountPerPaymentRequest as {
+//             paymentRequestId: string;
+//             amount: number;
+//             userId: number;
+//         }[]) {
+//             await prisma.paymentRequestToUser.update({
+//                 where: {
+//                     userId_paymentRequestId: {
+//                         userId: userId,
+//                         paymentRequestId: paymentRequestId!,
+//                     },
+//                 },
+//                 data: {
 
-        return await prisma.paymentLink.update({
-            where: {
-                id: link.id,
-            },
-            data: {
-                paid: true,
-                paidDate: new Date(),
-            },
-        });
-    });
-}
+//                     payedAmount: {
+//                         increment: amount,
+//                     },
+//                     lastPaymentDate: new Date(),
+//                 },
+//             });
+//         }
+
+//         return await prisma.paymentLink.update({
+//             where: {
+//                 id: link.id,
+//             },
+//             data: {
+//                 paid: true,
+//                 paidDate: new Date(),
+//             },
+//         });
+//     });
+// }
 
 export type PayResponse = /*Partial<PaymentLink> & { receivingUser: User; sendingUser: User } &*/ {
     paymentMethod: string;
@@ -50,49 +52,128 @@ export type PayResponse = /*Partial<PaymentLink> & { receivingUser: User; sendin
 };
 
 export async function GET(request: NextRequest, { params }: { params: { jwt: string } }): Promise<NextResponse> {
-    let link = await prisma.paymentLink.findUnique({
+    let jwtPayLoad: JwtPayload;
+    try {
+        const jwtString = decodeURIComponent(params.jwt);
+        jwtPayLoad = jwt.verify(jwtString, process.env.JWT_SECRET!) as JwtPayload;
+    } catch (ex) {
+        console.error("Could not parse jwt", ex);
+        return NextResponse.json({}, { status: 400 });
+    }
+
+    console.log("jwt", jwtPayLoad);
+
+    const balance = await prisma.relativeUserBalance.findUnique({
         where: {
-            id: params.jwt,
+            moneyHolderId_moneyReceiverId: {
+                moneyHolderId: jwtPayLoad.h,
+                moneyReceiverId: jwtPayLoad.r,
+            },
         },
         select: {
-            amount: true,
-            id: true,
-            paid: true,
-            paidDate: true,
-            paymentMethod: true,
-            molliePaymentId: true,
-            amountPerPaymentRequest: true,
-            receivingUser: {
+            moneyHolder: {
                 select: {
-                    email: true,
                     id: true,
-                    userName: true,
+                    email: true,
                     avatarUrl: true,
+                    userName: true,
                 },
             },
-            sendingUser: {
+            moneyReceiver: {
                 select: {
-                    iban: true,
-                    email: true,
                     id: true,
-                    userName: true,
+                    email: true,
                     avatarUrl: true,
+                    userName: true,
+                    iban: true,
+                    mollieApiKey: true,
+                },
+            },
+            amount: true,
+            lastRelatingPaymentRequest: {
+                select: {
+                    name: true,
                 },
             },
         },
     });
 
-    if (!link) {
-        return NextResponse.json(undefined, { status: 404 });
+    if (!balance) {
+        return NextResponse.json(null, { status: 404 });
     }
 
-    let mollieClient;
-    if (link.paymentMethod === "mollie" && link.molliePaymentId && (mollieClient = getClientForUser(link.sendingUser))) {
-        const payment = await mollieClient.payments.get(link.molliePaymentId);
-        return NextResponse.json({ ...link, molliePaymentId: undefined, status: payment.status, checkoutUrl: payment.getCheckoutUrl() });
-    }
+    const otherWayBalance = await prisma.relativeUserBalance.findUnique({
+        where: {
+            moneyHolderId_moneyReceiverId: {
+                moneyHolderId: jwtPayLoad.r,
+                moneyReceiverId: jwtPayLoad.h,
+            },
+        },
+        select: {
+            amount: true,
+            lastRelatingPaymentRequest: {
+                select: {
+                    name: true,
+                },
+            },
+        },
+    });
 
-    return NextResponse.json(link);
+    // const bal = await getRelativeBalance(jwtPayLoad.r, jwtPayLoad.s);
+
+    // let link = await prisma.paymentLink.findUnique({
+    //     where: {
+    //         id: params.jwt,
+    //     },
+    //     select: {
+    //         amount: true,
+    //         id: true,
+    //         paid: true,
+    //         paidDate: true,
+    //         paymentMethod: true,
+    //         molliePaymentId: true,
+    //         amountPerPaymentRequest: true,
+    //         receivingUser: {
+    //             select: {
+    //                 email: true,
+    //                 id: true,
+    //                 userName: true,
+    //                 avatarUrl: true,
+    //             },
+    //         },
+    //         sendingUser: {
+    //             select: {
+    //                 iban: true,
+    //                 email: true,
+    //                 id: true,
+    //                 userName: true,
+    //                 avatarUrl: true,
+    //             },
+    //         },
+    //     },
+    // });
+
+    // if (!link) {
+    //     return NextResponse.json(undefined, { status: 404 });
+    // }
+
+    // let mollieClient;
+    // if (link.paymentMethod === "mollie" && link.molliePaymentId && (mollieClient = getClientForUser(link.sendingUser))) {
+    //     const payment = await mollieClient.payments.get(link.molliePaymentId);
+    //     return NextResponse.json({ ...link, molliePaymentId: undefined, status: payment.status, checkoutUrl: payment.getCheckoutUrl() });
+    // }
+
+    return NextResponse.json({
+        balance: {
+            ...balance,
+            moneyReceiver: {
+                ...balance.moneyReceiver,
+                mollieApiKey: undefined,
+            },
+        },
+        otherWayBalance,
+        paymentMethod: balance.moneyReceiver.mollieApiKey ? "mollie" : "iban",
+    });
 }
 
 export async function POST(request: NextRequest, { params }: { params: { jwt: string } }): Promise<NextResponse> {

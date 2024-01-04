@@ -40,17 +40,6 @@ import { useRouter } from "next/navigation";
 import { LogOutButton } from "@/components/LogOutButton";
 import { AppHeader } from "@/components/AppHeader";
 import { useEffect, useState } from "react";
-import { isError } from "util";
-
-function getUserPayed(request: PaymentRequest & { usersToPay: { user: User; payedAmount: number; partsOfAmount: number }[] }, userId: number) {
-    let totalParts = 0;
-    request.usersToPay.forEach((e) => (totalParts += e.partsOfAmount));
-
-    let user = request.usersToPay.find((e) => e.user.id === userId);
-    if (!user) return false;
-
-    return user.payedAmount >= (user.partsOfAmount / totalParts) * request.amount;
-}
 
 function UserSettingsModal(props: { isOpen: boolean; onClose: () => void }) {
     // const { isOpen, onOpen, onClose } = useDisclosure()
@@ -179,21 +168,15 @@ export default function HomePage() {
                                 </CardHeader>
                                 <CardBody pt={0}>
                                     <AvatarGroup size="md" max={8}>
-                                        {[...e.usersToPay]
-                                            .sort((a, b) => a.payedAmount - b.partsOfAmount)
-                                            .map((u) => {
-                                                const payed = getUserPayed(e, u.user.id);
-                                                return (
-                                                    <Avatar
-                                                        key={u.user.id}
-                                                        name={u.user.userName || u.user.email}
-                                                        src={u.user.avatarUrl || undefined}>
-                                                        <AvatarBadge boxSize="1.25em" bg={payed ? "green.500" : "red.500"}>
-                                                            <FontAwesomeIcon color="white" size="2xs" icon={payed ? faCheck : faTimes} />
-                                                        </AvatarBadge>
-                                                    </Avatar>
-                                                );
-                                            })}
+                                        {e.usersToPay.map((u) => {
+                                            return (
+                                                <Avatar key={u.user.id} name={u.user.userName || u.user.email} src={u.user.avatarUrl || undefined}>
+                                                    {/* <AvatarBadge boxSize="1.25em" bg={payed ? "green.500" : "red.500"}>
+                                                        <FontAwesomeIcon color="white" size="2xs" icon={payed ? faCheck : faTimes} />
+                                                    </AvatarBadge> */}
+                                                </Avatar>
+                                            );
+                                        })}
                                     </AvatarGroup>
                                 </CardBody>
                                 {/* <CardFooter>
