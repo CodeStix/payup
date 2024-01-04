@@ -29,9 +29,6 @@ model User {
   // This user is related to because they initiated a connected to this user
   responders UserToUser[] @relation("responders")
 
-  // receivedLinks PaymentLink[] @relation("receivingLinkUser")
-  // sentLinks     PaymentLink[] @relation("sendingLinkUser")
-
   holdsMoneyFrom         RelativeUserBalance[] @relation("relativeBalanceMoneyHolder")
   shouldReceiveMoneyFrom RelativeUserBalance[] @relation("relativeBalanceMoneyReceiver")
 }
@@ -87,22 +84,7 @@ model RelativeUserBalance {
   lastRelatingPaymentRequest   PaymentRequest? @relation(fields: [lastRelatingPaymentRequestId], references: [id])
   lastRelatingPaymentRequestId String?
 
+  currentMolliePaymentId String?
+
   @@id([moneyHolderId, moneyReceiverId])
 }
-
-// model PaymentLink {
-//   id                      String    @id @default(uuid())
-//   paid                    Boolean
-//   paidDate                DateTime?
-//   amount                  Float
-//   amountPerPaymentRequest Json
-//   receivingUser           User      @relation(fields: [receivingUserId], references: [id], name: "receivingLinkUser", onDelete: Cascade)
-//   receivingUserId         Int
-//   sendingUser             User      @relation(fields: [sendingUserId], references: [id], name: "sendingLinkUser", onDelete: Cascade)
-//   sendingUserId           Int
-
-//   paymentMethod   String  @default("iban")
-//   molliePaymentId String?
-
-//   createdDate DateTime @default(now())
-// }

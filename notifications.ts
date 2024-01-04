@@ -154,12 +154,19 @@ export type JwtPayload = {
     r: number;
     // User id that currently holds their money
     h: number;
+    // Original amount calculated during creation
+    o: number;
 };
 
-export async function generatePaymentLink(holder: number, receiver: number) {
+export function generateJwt(payload: JwtPayload) {
+    return jwt.sign(payload, JWT_SECRET!, { expiresIn: 60 * 60 * 24 * 30 });
+}
+
+export async function generatePaymentLink(holder: number, receiver: number, amount: number) {
     const jwtPayload: JwtPayload = {
         r: receiver,
         h: holder,
+        o: amount,
     };
 
     // const link = await prisma.paymentLink.create({
@@ -173,7 +180,7 @@ export async function generatePaymentLink(holder: number, receiver: number) {
     //     },
     // });
 
-    const jwtString = jwt.sign(jwtPayload, JWT_SECRET!, { expiresIn: 60 * 60 * 24 * 30 });
+    const jwtString = generateJwt(jwtPayload);
     return `${SERVER_URL}/pay/${encodeURIComponent(jwtString)}`;
     // return `${SERVER_URL}/pay/${encodeURIComponent(link.id)}`;
 }
@@ -241,7 +248,7 @@ export async function notifyUsers() {
             continue;
         }
 
-        const paymentLink = await generatePaymentLink(balance.moneyHolder.id, balance.moneyReceiver.id);
+        const paymentLink = await generatePaymentLink(balance.moneyHolder.id, balance.moneyReceiver.id, owsAmount);
 
         console.log(balance.moneyHolder.email, "should send money to", balance.moneyReceiver.email, "=", owsAmount, paymentLink);
 

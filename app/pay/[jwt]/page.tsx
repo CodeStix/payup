@@ -1,28 +1,30 @@
 "use client";
 
-import type { PayResponse } from "@/app/api/pay/[jwt]/route";
 import { fetcher, getUserDisplayName, removeEmailDomain } from "@/util";
 import { Button, Text, Center, Heading, Skeleton, AlertTitle, Alert, AlertIcon, Flex, Link } from "@chakra-ui/react";
 import { faArrowRight, faCheckCircle, faClipboard, faClipboardCheck } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { RelativeUserBalance, User } from "@prisma/client";
 import { signIn, signOut, useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 
 export default function Home({ params }: { params: { jwt: string } }) {
-    const router = useRouter();
-
     const {
         data: link,
         isLoading: isLoadingLink,
         mutate: mutateLink,
     } = useSWR<{
+        amount: number;
         balance: RelativeUserBalance & { lastRelatingPaymentRequest?: { name: string }; moneyHolder: User; moneyReceiver: User };
         otherWayBalance?: RelativeUserBalance & { lastRelatingPaymentRequest?: { name: string } };
         paymentMethod: "mollie" | "iban";
-    }>(`/api/pay/${params.jwt}`, fetcher);
+    }>(`/api/pay/${params.jwt}`, fetcher, {
+        revalidateOnReconnect: false,
+        revalidateOnFocus: false,
+        revalidateIfStale: false,
+    });
 
     const [loading, setLoading] = useState(false);
     const [copied, setCopied] = useState(false);
@@ -30,27 +32,43 @@ export default function Home({ params }: { params: { jwt: string } }) {
 
     const lastPaymentDate = link?.balance.lastPaymentDate;
     const amount = !link ? null : link.otherWayBalance ? link.balance.amount - link.otherWayBalance.amount : link.balance.amount;
-    const paid = amount ? amount < 0.01 : false;
+    const paid = amount !== null && amount < 0.01;
 
-    async function fetchPay(linkId: string) {
-        const prevLoading = loading;
+    const searchParams = useSearchParams();
+
+    async function payUsingMollie() {
+        let prevLoading = loading;
         setLoading(true);
         try {
-            const res = await fetch("/api/pay/" + encodeURIComponent(linkId), {
+            const res = await fetch(`/api/pay/${encodeURIComponent(params.jwt)}/mollie`, {
                 method: "POST",
             });
 
-            if (res.ok) {
-                const payRes: PayResponse = await res.json();
-                if (payRes.paymentMethod === "mollie") {
-                    if (!payRes.paid && payRes.status !== "paid") {
-                        location.href = payRes.checkoutUrl!;
-                    } else {
-                        await mutateLink();
-                    }
-                }
+            if (!res.ok) {
+                console.error("Could not pay using mollie", await res.text());
             } else {
-                console.error("Could not pay", await res.text());
+                const data = await res.json();
+                console.log("Mollie payment", data);
+                location.href = data.checkoutUrl;
+                prevLoading = true;
+            }
+        } finally {
+            setLoading(prevLoading);
+        }
+    }
+
+    async function payUsingIban() {
+        const prevLoading = loading;
+        setLoading(true);
+        try {
+            const res = await fetch(`/api/pay/${encodeURIComponent(params.jwt)}/iban`, {
+                method: "POST",
+            });
+
+            if (!res.ok) {
+                console.error("Could not pay using iban", await res.text());
+            } else {
+                // Next time the user refreshes the UI will update
             }
         } finally {
             setLoading(prevLoading);
@@ -63,7 +81,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
                 // Pay automatically
                 if (!paidRef.current) {
                     paidRef.current = true;
-                    // void fetchPay(params.jwt);
+                    void payUsingIban();
                 }
             }
         }
@@ -77,12 +95,18 @@ export default function Home({ params }: { params: { jwt: string } }) {
                 {link?.paymentMethod === "mollie" ? (
                     <>
                         {paid ? (
-                            <Heading color="green.500" textAlign="center">
-                                You already paid {link.balance.moneyReceiver && getUserDisplayName(link.balance.moneyReceiver)}!
-                            </Heading>
+                            searchParams.get("status") === "paid" ? (
+                                <Heading color="green.500" textAlign="center">
+                                    You just paid {link.balance.moneyReceiver && getUserDisplayName(link.balance.moneyReceiver)}!
+                                </Heading>
+                            ) : (
+                                <Heading color="green.500" textAlign="center">
+                                    You already paid {link.balance.moneyReceiver && getUserDisplayName(link.balance.moneyReceiver)}!
+                                </Heading>
+                            )
                         ) : (
                             <Heading as="h2" textAlign="center">
-                                You still owe {link.balance.moneyReceiver && getUserDisplayName(link.balance.moneyReceiver)} €{amount}!
+                                You still owe {link.balance.moneyReceiver && getUserDisplayName(link.balance.moneyReceiver)} €{amount?.toFixed(2)}!
                             </Heading>
                         )}
                     </>
@@ -90,11 +114,12 @@ export default function Home({ params }: { params: { jwt: string } }) {
                     <>
                         {paid ? (
                             <Heading color="yellow.500" textAlign="center">
-                                You could still be owing €{amount} to {link?.balance.moneyReceiver && getUserDisplayName(link.balance.moneyReceiver)}!
+                                You could still be owing €{link?.amount?.toFixed(2)} to{" "}
+                                {link?.balance.moneyReceiver && getUserDisplayName(link.balance.moneyReceiver)}!
                             </Heading>
                         ) : (
                             <Heading as="h2" textAlign="center">
-                                You still owe {link?.balance.moneyReceiver && getUserDisplayName(link.balance.moneyReceiver)} €{amount}!
+                                You still owe {link?.balance.moneyReceiver && getUserDisplayName(link.balance.moneyReceiver)} €{amount?.toFixed(2)}!
                             </Heading>
                         )}
                     </>
@@ -114,12 +139,12 @@ export default function Home({ params }: { params: { jwt: string } }) {
 
             {/* && (!lastPaymentDate || new Date().getTime() - new Date(lastPaymentDate).getTime() > 60 * 1000) */}
             {link?.paymentMethod === "iban" && paid && (
-                <Alert status="warning" rounded="lg" maxW="lg" flexDir="column" textAlign="center">
+                <Alert status="warning" rounded="lg" maxW="sm" flexDir="column" textAlign="center">
                     <Flex>
                         <AlertIcon />
                         <AlertTitle>You already paid?</AlertTitle>
                     </Flex>
-                    You already opened this link {lastPaymentDate && <>at {new Date(lastPaymentDate).toLocaleString()}</>}.
+                    You already opened this link{lastPaymentDate && <> at {new Date(lastPaymentDate).toLocaleString()}</>}.
                 </Alert>
             )}
 
@@ -134,7 +159,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
                         rightIcon={<FontAwesomeIcon icon={paid ? faCheckCircle : faArrowRight} />}
                         onClick={() => {
                             setLoading(true);
-                            // void fetchPay(link.id);
+                            void payUsingMollie();
                         }}>
                         {paid ? <>You already paid!</> : <>Select your bank</>}
                     </Button>
@@ -172,6 +197,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
                         <>
                             Open your banking app and send €{amount?.toFixed(2) ?? 0} to {link && getUserDisplayName(link.balance.moneyReceiver)} (
                             {link?.balance.moneyReceiver.iban}). You can close this page if you already paid it, you won&apos;t be notified again.
+                            This link detects if you paid or not.
                         </>
                     )}
                 </Text>
