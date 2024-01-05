@@ -167,6 +167,7 @@ export default function HomePage() {
     const { data, isLoading } = useSWR<{
         requests: (PaymentRequest & { usersToPay: { user: User; payedAmount: number; partsOfAmount: number }[] })[];
     }>("/api/request", fetcher);
+    const { data: user, isLoading: isLoadingUser, mutate: mutateUser } = useSWR<User>("/api/user", fetcher);
     const [loading, setLoading] = useState(false);
     const { isOpen: userSettingsIsOpen, onOpen: userSettingsOnOpen, onClose: userSettingsOnClose } = useDisclosure();
 
@@ -202,64 +203,128 @@ export default function HomePage() {
 
                 <Divider />
 
-                <Skeleton isLoaded={!isLoading} minHeight={"4rem"}>
-                    <Flex flexDir="column" gap="1rem">
-                        <Button
-                            isLoading={loading}
-                            isDisabled={loading}
-                            onClick={createNew}
-                            width="100%"
-                            colorScheme="orange"
-                            leftIcon={<FontAwesomeIcon icon={faPlus} />}>
-                            Create new payment request
-                        </Button>
+                <Skeleton isLoaded={!isLoading && !isLoadingUser} minHeight={"4rem"}>
+                    {user?.iban || user?.mollieApiKey ? (
+                        <Flex flexDir="column" gap="1rem">
+                            <Button
+                                isLoading={loading}
+                                isDisabled={loading}
+                                onClick={createNew}
+                                width="100%"
+                                colorScheme="orange"
+                                leftIcon={<FontAwesomeIcon icon={faPlus} />}>
+                                Create new payment request
+                            </Button>
 
-                        {data?.requests?.map((e) => (
-                            <Card
-                                key={e.id}
-                                // colorScheme="green"
-                                background="#eee"
-                                shadow="none"
-                                border="1px solid transparent"
-                                _hover={{ /*transform: "translate(0, -5px)",*/ background: "white", border: "1px solid #eee" }}
-                                style={{ transition: "100ms" }}
-                                cursor="pointer"
-                                onClick={() => router.push(`/request/${e.id}`)}>
-                                <CardHeader display="flex" alignItems="center">
-                                    <Heading size="md">{e.name}</Heading>
-                                    <Spacer />
-                                    <Text fontSize="x-large">€{e.amount.toFixed(2)}</Text>
-                                </CardHeader>
-                                <CardBody pt={0}>
-                                    <AvatarGroup size="md" max={8}>
-                                        {e.usersToPay.map((u) => {
-                                            return (
-                                                <Avatar key={u.user.id} name={u.user.userName || u.user.email} src={u.user.avatarUrl || undefined}>
-                                                    {/* <AvatarBadge boxSize="1.25em" bg={payed ? "green.500" : "red.500"}>
+                            {data?.requests?.map((e) => (
+                                <Card
+                                    key={e.id}
+                                    // colorScheme="green"
+                                    background="#eee"
+                                    shadow="none"
+                                    border="1px solid transparent"
+                                    _hover={{ /*transform: "translate(0, -5px)",*/ background: "white", border: "1px solid #eee" }}
+                                    style={{ transition: "100ms" }}
+                                    cursor="pointer"
+                                    onClick={() => router.push(`/request/${e.id}`)}>
+                                    <CardHeader display="flex" alignItems="center">
+                                        <Heading size="md">{e.name}</Heading>
+                                        <Spacer />
+                                        <Text fontSize="x-large">€{e.amount.toFixed(2)}</Text>
+                                    </CardHeader>
+                                    <CardBody pt={0}>
+                                        <AvatarGroup size="md" max={8}>
+                                            {e.usersToPay.map((u) => {
+                                                return (
+                                                    <Avatar
+                                                        key={u.user.id}
+                                                        name={u.user.userName || u.user.email}
+                                                        src={u.user.avatarUrl || undefined}>
+                                                        {/* <AvatarBadge boxSize="1.25em" bg={payed ? "green.500" : "red.500"}>
                                                         <FontAwesomeIcon color="white" size="2xs" icon={payed ? faCheck : faTimes} />
                                                     </AvatarBadge> */}
-                                                </Avatar>
-                                            );
-                                        })}
-                                    </AvatarGroup>
-                                </CardBody>
-                                {/* <CardFooter>
+                                                    </Avatar>
+                                                );
+                                            })}
+                                        </AvatarGroup>
+                                    </CardBody>
+                                    {/* <CardFooter>
                                     <Button colorScheme="blue">Edit</Button>
                                 </CardFooter> */}
-                            </Card>
-                        ))}
+                                </Card>
+                            ))}
 
-                        <Button leftIcon={<FontAwesomeIcon icon={faUserCog} />} variant="ghost" colorScheme="blue" onClick={userSettingsOnOpen}>
-                            Settings
-                        </Button>
-                    </Flex>
+                            <Button leftIcon={<FontAwesomeIcon icon={faUserCog} />} variant="ghost" colorScheme="blue" onClick={userSettingsOnOpen}>
+                                Settings
+                            </Button>
+                        </Flex>
+                    ) : (
+                        <AccountSetup onDone={() => mutateUser()} />
+                    )}
                 </Skeleton>
-
-                {/* <Box mt={"auto"}></Box>
-                <LogOutButton /> */}
             </Flex>
 
             <UserSettingsModal isOpen={userSettingsIsOpen} onClose={userSettingsOnClose} />
         </Flex>
+    );
+}
+
+function AccountSetup(props: { onDone: () => void }) {
+    const [iban, setIban] = useState("");
+    const [ibanError, setIbanError] = useState("");
+    const [saving, setSaving] = useState(false);
+
+    async function saveChanges() {
+        setSaving(true);
+        setIbanError("");
+        try {
+            const res = await fetch("/api/user", {
+                method: "PATCH",
+                body: JSON.stringify({
+                    iban,
+                }),
+            });
+            if (res.ok) {
+                props.onDone();
+            } else {
+                const errors = await res.json();
+                console.error("Could not setup account", errors);
+                setIbanError(errors.iban);
+            }
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    return (
+        <form
+            style={{ display: "flex", gap: "1rem", flexDirection: "column" }}
+            onSubmit={(ev) => {
+                ev.preventDefault();
+                void saveChanges();
+            }}>
+            <Text opacity={0.5} textAlign="center">
+                Welcome to Pay Up!
+            </Text>
+            <Text opacity={0.5} textAlign="center">
+                Please enter your IBAN (banking number) where people will send you money.
+            </Text>
+
+            <FormControl isInvalid={!!ibanError} isDisabled={saving}>
+                <FormLabel>IBAN</FormLabel>
+                <Input type="text" value={iban} onChange={(ev) => setIban(ev.target.value)} />
+                {ibanError ? (
+                    <FormErrorMessage>{ibanError}. You can find this number in your banking app, example: NL62INGB6770096250</FormErrorMessage>
+                ) : (
+                    <FormHelperText>
+                        This is required if you want to accept payments via your banking number. People can only send money to this address.
+                    </FormHelperText>
+                )}
+            </FormControl>
+
+            <Button type="submit" isLoading={saving} isDisabled={saving} rightIcon={<FontAwesomeIcon icon={faArrowRight} />} colorScheme="orange">
+                Next: Create Payment Request
+            </Button>
+        </form>
     );
 }
