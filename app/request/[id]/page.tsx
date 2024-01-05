@@ -60,6 +60,10 @@ import {
     ModalOverlay,
     ButtonGroup,
     Tooltip,
+    Alert,
+    AlertDescription,
+    AlertIcon,
+    AlertTitle,
 } from "@chakra-ui/react";
 import {
     faArrowDown,
@@ -726,9 +730,11 @@ function ManualPaymentModal(props: { isOpen: boolean; onClose: () => void; money
     const [direction, setDirection] = useState<null | boolean>(null);
     const [amount, setAmount] = useState("0");
     const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState<"transfer-not-allowed-user" | null>(null);
 
     async function submit() {
         setSubmitting(true);
+        setError(null);
         try {
             const res = await fetch("/api/balance", {
                 method: "PATCH",
@@ -740,6 +746,8 @@ function ManualPaymentModal(props: { isOpen: boolean; onClose: () => void; money
             });
             if (res.ok) {
                 props.onSubmit();
+            } else {
+                setError("transfer-not-allowed-user");
             }
         } finally {
             setSubmitting(false);
@@ -761,6 +769,18 @@ function ManualPaymentModal(props: { isOpen: boolean; onClose: () => void; money
                         void submit();
                     }}>
                     <ModalBody display="flex" flexDir="column" gap={4}>
+                        {error === "transfer-not-allowed-user" && (
+                            <Alert status="error" rounded="lg" flexDir="column">
+                                <Flex>
+                                    <AlertIcon />
+                                    <AlertTitle>Transfer failed</AlertTitle>
+                                </Flex>
+                                <AlertDescription textAlign="center">
+                                    Only {getUserDisplayName(props.moneyReceiver)} can mark payments as paid according to their settings.
+                                </AlertDescription>
+                            </Alert>
+                        )}
+
                         <FormControl isDisabled={submitting}>
                             <FormLabel>Select payment direction</FormLabel>
                             <Flex bg="gray.100" p={2} rounded="lg" flexDir="column" alignItems="center" gap={2}>

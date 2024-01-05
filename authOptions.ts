@@ -34,6 +34,7 @@ export const authOptions: AuthOptions = {
                     email: user.email,
                     userName: user.name,
                     avatarUrl: user.image,
+                    allowOtherUserManualTranser: true,
                 },
                 update: {
                     email: user.email,

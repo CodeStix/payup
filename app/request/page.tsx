@@ -31,6 +31,7 @@ import {
     FormLabel,
     Input,
     useDisclosure,
+    Switch,
 } from "@chakra-ui/react";
 import type { PaymentRequest, User } from "@prisma/client";
 import { faArrowRight, faCheck, faPlus, faTimes, faUserCog } from "@fortawesome/free-solid-svg-icons";
@@ -47,6 +48,7 @@ function UserSettingsModal(props: { isOpen: boolean; onClose: () => void }) {
     const { data: user, isLoading: isLoadingUser } = useSWR<User>("/api/user", fetcher);
     const [iban, setIban] = useState("");
     const [mollieApiKey, setMollieApiKey] = useState("");
+    const [allowOtherUserManualTranser, setAllowOtherUserManualTranser] = useState(false);
     const [saving, setSaving] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -62,6 +64,12 @@ function UserSettingsModal(props: { isOpen: boolean; onClose: () => void }) {
         }
     }, [user?.mollieApiKey]);
 
+    useEffect(() => {
+        if (typeof user?.allowOtherUserManualTranser === "boolean") {
+            setAllowOtherUserManualTranser(user.allowOtherUserManualTranser);
+        }
+    }, [user?.allowOtherUserManualTranser]);
+
     async function saveChanges() {
         setSaving(true);
         setErrors({});
@@ -71,6 +79,7 @@ function UserSettingsModal(props: { isOpen: boolean; onClose: () => void }) {
                 body: JSON.stringify({
                     mollieApiKey,
                     iban,
+                    allowOtherUserManualTranser,
                 }),
             });
             if (res.ok) {
@@ -120,6 +129,19 @@ function UserSettingsModal(props: { isOpen: boolean; onClose: () => void }) {
                                         mollie
                                     </Link>{" "}
                                     site to see what&apos;s up.
+                                </FormHelperText>
+                            )}
+                        </FormControl>
+
+                        <FormControl isInvalid={"allowOtherUserManualTranser" in errors} isDisabled={saving || isLoadingUser}>
+                            <FormLabel>Allow others to manage payments for you</FormLabel>
+                            <Switch isChecked={allowOtherUserManualTranser} onChange={(ev) => setAllowOtherUserManualTranser(ev.target.checked)} />
+                            {"allowOtherUserManualTranser" in errors ? (
+                                <FormErrorMessage>{errors["allowOtherUserManualTranser"]}</FormErrorMessage>
+                            ) : (
+                                <FormHelperText>
+                                    If true, other people can let Pay Up know that you got paid (if you paid something). Disable it if you don't
+                                    thrust your friends.
                                 </FormHelperText>
                             )}
                         </FormControl>

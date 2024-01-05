@@ -23,6 +23,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             avatarUrl: true,
             iban: true,
             registerDate: true,
+            allowOtherUserManualTranser: true,
         },
     });
 
@@ -35,7 +36,7 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
         return NextResponse.json({}, { status: 401 });
     }
 
-    const body = (await request.json()) as { iban: string; mollieApiKey: string };
+    const body = (await request.json()) as { iban?: string; mollieApiKey?: string; allowOtherUserManualTranser?: boolean };
 
     if (typeof body.iban !== "string" || body.iban) {
         if (typeof body.iban !== "string" || !iban.isValid(body.iban)) {
@@ -50,6 +51,7 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
         data: {
             mollieApiKey: body.mollieApiKey || undefined,
             iban: body.iban || undefined,
+            allowOtherUserManualTranser: typeof body.allowOtherUserManualTranser === "boolean" ? body.allowOtherUserManualTranser : undefined,
         },
     });
 
