@@ -62,7 +62,9 @@ import {
     Tooltip,
 } from "@chakra-ui/react";
 import {
+    faArrowDown,
     faArrowRight,
+    faArrowUp,
     faCheck,
     faCheckCircle,
     faCheckDouble,
@@ -611,10 +613,11 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
             {generatedPaymentLink && (
                 <PaymentLinkModal showOpenButton={false} isOpen={paymentLinkIsOpen} onClose={paymentLinkOnClose} paymentLink={generatedPaymentLink} />
             )}
-            {manualPaymentMoneyHolder && (
+            {manualPaymentMoneyHolder && request?.paidBy && (
                 <ManualPaymentModal
                     isOpen={manualPaymentIsOpen}
                     onClose={manualPaymentOnClose}
+                    moneyReceiver={request.paidBy}
                     moneyHolder={manualPaymentMoneyHolder}
                     onSubmit={() => {
                         void mutateRequest();
@@ -719,7 +722,7 @@ function PayingUserListItem(props: {
     );
 }
 
-function ManualPaymentModal(props: { isOpen: boolean; onClose: () => void; moneyHolder: User; onSubmit: () => void }) {
+function ManualPaymentModal(props: { isOpen: boolean; onClose: () => void; moneyHolder: User; onSubmit: () => void; moneyReceiver: User }) {
     const [direction, setDirection] = useState<null | boolean>(null);
     const [amount, setAmount] = useState("0");
     const [submitting, setSubmitting] = useState(false);
@@ -732,6 +735,7 @@ function ManualPaymentModal(props: { isOpen: boolean; onClose: () => void; money
                 body: JSON.stringify({
                     amount: direction ? -parseFloat(amount) : parseFloat(amount),
                     moneyHolderId: props.moneyHolder.id,
+                    moneyReceiverId: props.moneyReceiver.id,
                 }),
             });
             if (res.ok) {
@@ -758,41 +762,53 @@ function ManualPaymentModal(props: { isOpen: boolean; onClose: () => void; money
                     }}>
                     <ModalBody display="flex" flexDir="column" gap={4}>
                         <FormControl isDisabled={submitting}>
-                            <FormLabel>
-                                Select what applies to{" "}
-                                <Avatar
-                                    mx={1}
-                                    size="xs"
-                                    name={getUserDisplayName(props.moneyHolder)}
-                                    src={props.moneyHolder.avatarUrl || undefined}
-                                />{" "}
-                                {getUserDisplayName(props.moneyHolder)}
-                            </FormLabel>
-                            <Flex flexDir="column" gap={2}>
-                                <Button
-                                    isDisabled={submitting}
-                                    type="button"
-                                    variant={direction === true ? "outline" : "solid"}
-                                    onClick={() => setDirection(true)}
-                                    colorScheme="green"
-                                    leftIcon={<FontAwesomeIcon icon={faHandshake} />}>
-                                    I received money
-                                </Button>
-                                <Button
-                                    isDisabled={submitting}
-                                    type="button"
-                                    variant={direction === false ? "outline" : "solid"}
-                                    onClick={() => setDirection(false)}
-                                    colorScheme="red"
-                                    leftIcon={<FontAwesomeIcon icon={faHandHoldingDollar} />}>
-                                    I sent money
-                                </Button>
+                            <FormLabel>Select payment direction</FormLabel>
+                            <Flex bg="gray.100" p={2} rounded="lg" flexDir="column" alignItems="center" gap={2}>
+                                <Text>
+                                    <Avatar
+                                        mx={1}
+                                        size="xs"
+                                        name={getUserDisplayName(props.moneyHolder)}
+                                        src={props.moneyHolder.avatarUrl || undefined}
+                                    />{" "}
+                                    {getUserDisplayName(props.moneyHolder)}
+                                </Text>
+                                <Flex gap={2} alignItems="center">
+                                    <Text opacity={direction === true ? 0.5 : 0}>€ {amount}</Text>
+                                    <IconButton
+                                        aria-label="Send money"
+                                        isDisabled={submitting}
+                                        type="button"
+                                        variant={direction === true ? "outline" : "solid"}
+                                        onClick={() => setDirection(true)}
+                                        colorScheme="blue"
+                                        icon={<FontAwesomeIcon icon={faArrowDown} />}></IconButton>
+
+                                    <IconButton
+                                        aria-label="Received money"
+                                        isDisabled={submitting}
+                                        type="button"
+                                        variant={direction === false ? "outline" : "solid"}
+                                        onClick={() => setDirection(false)}
+                                        colorScheme="blue"
+                                        icon={<FontAwesomeIcon icon={faArrowUp} />}></IconButton>
+                                    <Text opacity={direction === false ? 0.5 : 0}>€ {amount}</Text>
+                                </Flex>
+                                <Text>
+                                    <Avatar
+                                        mx={1}
+                                        size="xs"
+                                        name={getUserDisplayName(props.moneyReceiver)}
+                                        src={props.moneyReceiver.avatarUrl || undefined}
+                                    />{" "}
+                                    {getUserDisplayName(props.moneyReceiver)}
+                                </Text>
                             </Flex>
                         </FormControl>
 
                         {direction !== null && (
                             <FormControl isDisabled={submitting}>
-                                <FormLabel>Amount {direction ? "received" : "sent"}</FormLabel>
+                                <FormLabel>Amount</FormLabel>
                                 <NumberInput
                                     onBlur={(ev) => {
                                         setAmount(ev.target.value);
@@ -912,7 +928,7 @@ function PaymentStatusButton(props: {
                     icon={<FontAwesomeIcon icon={Math.abs(amount) < 0.01 ? faCheck : amount >= 0.01 ? faHourglass : faWarning} />}
                 />
             </PopoverTrigger>
-            <PopoverContent pr={4}>
+            <PopoverContent>
                 <PopoverArrow />
                 <PopoverCloseButton />
                 <PopoverHeader>Payment status</PopoverHeader>
@@ -937,13 +953,14 @@ function PaymentStatusButton(props: {
                     {amount >= 0.01 && (
                         <Text as="p" opacity={0.5}>
                             {getUserDisplayName(props.userToPay.user, sessionData?.user)} will be notified periodically (weekly) if they haven&apos;t
-                            paid. You can also share a payment link by pressing the green button.
+                            paid. You can also share a payment link/pay by pressing the green button.
                         </Text>
                     )}
 
                     <Divider />
 
-                    {amount <= -0.01 && sessionData?.user?.email === props.request.paidBy.email ? (
+                    {(amount <= -0.01 && sessionData?.user?.email === props.request.paidBy.email) ||
+                    (amount >= 0.01 && sessionData?.user?.email === props.userToPay.user.email) ? (
                         <Button
                             isDisabled={props.isDisabled}
                             onClick={() => props.onPaymentLink(amount < 0, true)}
@@ -965,9 +982,9 @@ function PaymentStatusButton(props: {
                         <></>
                     )}
 
-                    {sessionData?.user?.email === props.request.paidBy.email && (
+                    {props.userToPay.userId !== props.request.paidById && (
                         <Button
-                            isDisabled={props.isDisabled || props.request.paidBy.email !== sessionData?.user?.email}
+                            isDisabled={props.isDisabled}
                             variant="ghost"
                             onClick={props.onManualPayment}
                             colorScheme="blue"

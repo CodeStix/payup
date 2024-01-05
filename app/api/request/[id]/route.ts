@@ -258,19 +258,24 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
             prisma.relativeUserBalance.upsert({
                 where: {
                     moneyHolderId_moneyReceiverId: {
-                        moneyReceiverId: existingRequest.paidById,
-                        moneyHolderId: deletedUserToPay.userId!,
+                        // moneyReceiverId: existingRequest.paidById,
+                        // moneyHolderId: deletedUserToPay.userId!,
+                        moneyReceiverId: deletedUserToPay.userId!,
+                        moneyHolderId: existingRequest.paidById,
                     },
                 },
                 update: {
                     amount: {
-                        decrement: deletedAmountToPay,
+                        // decrement: deletedAmountToPay,
+                        increment: deletedAmountToPay,
                     },
                     lastRelatingPaymentRequestId: params.id,
                 },
                 create: {
-                    moneyReceiverId: existingRequest.paidById,
-                    moneyHolderId: deletedUserToPay.userId!,
+                    // moneyReceiverId: existingRequest.paidById,
+                    // moneyHolderId: deletedUserToPay.userId!,
+                    moneyReceiverId: deletedUserToPay.userId!,
+                    moneyHolderId: existingRequest.paidById,
                     amount: 0,
                 },
             })

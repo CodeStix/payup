@@ -11,26 +11,37 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         return NextResponse.json({}, { status: 401 });
     }
 
-    const body = (await request.json()) as { amount: number; moneyHolderId: number };
+    const body = (await request.json()) as { amount: number; moneyHolderId: number; moneyReceiverId: number };
 
-    if (typeof body.amount !== "number") {
+    if (typeof body.amount !== "number" || typeof body.moneyHolderId !== "number" || typeof body.moneyReceiverId !== "number") {
         return NextResponse.json(null, { status: 400 });
     }
+    if (Math.abs(body.amount) < 0.01) {
+        return NextResponse.json(null);
+    }
 
-    await prisma.relativeUserBalance.updateMany({
-        where: {
-            moneyReceiver: {
-                email: session.user.email,
+    try {
+        await prisma.relativeUserBalance.update({
+            where: {
+                moneyHolderId_moneyReceiverId: {
+                    moneyHolderId: body.amount > 0 ? body.moneyHolderId : body.moneyReceiverId,
+                    moneyReceiverId: body.amount > 0 ? body.moneyReceiverId : body.moneyHolderId,
+                },
+                moneyHolder: {
+                    OR: [{ allowOtherUserManualTranser: true }, { email: session.user.email }],
+                },
             },
-            moneyHolderId: body.moneyHolderId,
-        },
-        data: {
-            lastPaymentDate: new Date(),
-            amount: {
-                increment: body.amount,
+            data: {
+                lastPaymentDate: new Date(),
+                amount: {
+                    increment: Math.abs(body.amount),
+                },
             },
-        },
-    });
+        });
+    } catch (ex) {
+        console.error("Could not add manual balance", ex);
+        return NextResponse.json({}, { status: 400 });
+    }
 
     return NextResponse.json(null);
 }

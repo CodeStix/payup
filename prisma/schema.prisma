@@ -11,14 +11,15 @@ datasource db {
 }
 
 model User {
-  id            Int      @id @default(autoincrement())
-  userName      String?
-  email         String   @unique
-  registerDate  DateTime @default(now())
-  lastLoginDate DateTime @default(now())
-  avatarUrl     String?
-  iban          String?
-  mollieApiKey  String?
+  id                          Int      @id @default(autoincrement())
+  userName                    String?
+  email                       String   @unique
+  registerDate                DateTime @default(now())
+  lastLoginDate               DateTime @default(now())
+  avatarUrl                   String?
+  iban                        String?
+  mollieApiKey                String?
+  allowOtherUserManualTranser Boolean  @default(true)
 
   paymentRequests PaymentRequest[]       @relation("owner")
   requestedToPay  PaymentRequestToUser[]
