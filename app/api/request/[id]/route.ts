@@ -83,13 +83,47 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
         return NextResponse.json({}, { status: 401 });
     }
 
-    await prisma.paymentRequest.delete({
-        where: {
-            id: params.id,
-            owner: {
-                email: session.user.email,
+    await prisma.$transaction(async (prisma) => {
+        const deletedRequest = await prisma.paymentRequest.delete({
+            where: {
+                id: params.id,
+                owner: {
+                    email: session.user!.email!,
+                },
             },
-        },
+            include: {
+                usersToPay: {
+                    include: {
+                        user: true,
+                    },
+                },
+            },
+        });
+
+        const totalParts = getTotalParts(deletedRequest.usersToPay);
+
+        for (const userToPay of deletedRequest.usersToPay) {
+            const deletedAmountToPay = calculateUserAmount(totalParts, deletedRequest.amount, userToPay.partsOfAmount!);
+
+            await prisma.relativeUserBalance.upsert({
+                where: {
+                    moneyHolderId_moneyReceiverId: {
+                        moneyReceiverId: userToPay.userId!,
+                        moneyHolderId: deletedRequest.paidById,
+                    },
+                },
+                update: {
+                    amount: {
+                        increment: deletedAmountToPay,
+                    },
+                },
+                create: {
+                    moneyReceiverId: userToPay.userId!,
+                    moneyHolderId: deletedRequest.paidById,
+                    amount: 0,
+                },
+            });
+        }
     });
 
     return NextResponse.json({});
