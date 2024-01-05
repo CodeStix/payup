@@ -60,34 +60,35 @@ export async function GET(request: NextRequest, { params }: { params: { jwt: str
         await prisma.relativeUserBalance.update({
             where: {
                 moneyHolderId_moneyReceiverId: {
-                    moneyHolderId: jwtPayLoad.h,
-                    moneyReceiverId: jwtPayLoad.r,
+                    // Flipped
+                    moneyHolderId: jwtPayLoad.r,
+                    moneyReceiverId: jwtPayLoad.h,
                 },
             },
             data: {
                 amount: {
-                    set: 0,
+                    increment: parseInt(molliePayment.amount.value),
                 },
                 lastPaymentDate: new Date(),
                 currentMolliePaymentId: null,
             },
         });
 
-        try {
-            await prisma.relativeUserBalance.update({
-                where: {
-                    moneyHolderId_moneyReceiverId: {
-                        moneyHolderId: jwtPayLoad.r,
-                        moneyReceiverId: jwtPayLoad.h,
-                    },
-                },
-                data: {
-                    amount: {
-                        set: 0,
-                    },
-                },
-            });
-        } catch {}
+        // try {
+        //     await prisma.relativeUserBalance.update({
+        //         where: {
+        //             moneyHolderId_moneyReceiverId: {
+        //                 moneyHolderId: jwtPayLoad.r,
+        //                 moneyReceiverId: jwtPayLoad.h,
+        //             },
+        //         },
+        //         data: {
+        //             amount: {
+        //                 set: 0,
+        //             },
+        //         },
+        //     });
+        // } catch {}
     }
 
     return NextResponse.redirect(`${process.env.SERVER_URL}/pay/${params.jwt}?status=${encodeURIComponent(molliePayment.status)}`);

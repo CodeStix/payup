@@ -46,33 +46,34 @@ export async function POST(request: NextRequest, { params }: { params: { jwt: st
     await prisma.relativeUserBalance.update({
         where: {
             moneyHolderId_moneyReceiverId: {
-                moneyHolderId: jwtPayLoad.h,
-                moneyReceiverId: jwtPayLoad.r,
+                // Flipped
+                moneyHolderId: jwtPayLoad.r,
+                moneyReceiverId: jwtPayLoad.h,
             },
         },
         data: {
             lastPaymentDate: new Date(),
             amount: {
-                set: 0,
+                increment: ows,
             },
         },
     });
 
-    if (otherWayBalance) {
-        await prisma.relativeUserBalance.update({
-            where: {
-                moneyHolderId_moneyReceiverId: {
-                    moneyHolderId: jwtPayLoad.r,
-                    moneyReceiverId: jwtPayLoad.h,
-                },
-            },
-            data: {
-                amount: {
-                    set: 0,
-                },
-            },
-        });
-    }
+    // if (otherWayBalance) {
+    //     await prisma.relativeUserBalance.update({
+    //         where: {
+    //             moneyHolderId_moneyReceiverId: {
+    //                 moneyHolderId: jwtPayLoad.r,
+    //                 moneyReceiverId: jwtPayLoad.h,
+    //             },
+    //         },
+    //         data: {
+    //             amount: {
+    //                 set: 0,
+    //             },
+    //         },
+    //     });
+    // }
 
     return NextResponse.json({ message: "Done" });
 }
