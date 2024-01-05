@@ -55,6 +55,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             id: true,
             createdDate: true,
             amount: true,
+            paidBy: {
+                select: {
+                    email: true,
+                    userName: true,
+                    id: true,
+                    avatarUrl: true,
+                },
+            },
             usersToPay: {
                 select: {
                     partsOfAmount: true,

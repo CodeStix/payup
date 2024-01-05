@@ -10,7 +10,17 @@ export function getUserDisplayName(u: { userName?: string | null; email: string;
             return "You";
         }
     }
-    return u.userName || removeEmailDomain(u.email);
+
+    if (u.userName) {
+        return capitalize(u.userName);
+    } else {
+        return removeEmailDomain(u.email);
+    }
+}
+
+export function capitalize(str: string) {
+    const parts = str.split(" ");
+    return parts.map((e) => (e.length > 1 ? e[0].toUpperCase() + e.substring(1) : e)).join(" ");
 }
 
 export function getTotalParts(usersToPay: { partsOfAmount: number }[]) {

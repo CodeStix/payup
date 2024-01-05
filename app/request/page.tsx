@@ -37,7 +37,7 @@ import type { PaymentRequest, User } from "@prisma/client";
 import { faArrowRight, faCheck, faPlus, faTimes, faUserCog } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { signIn, signOut, useSession } from "next-auth/react";
-import { fetcher } from "@/util";
+import { fetcher, getUserDisplayName } from "@/util";
 import { useRouter } from "next/navigation";
 import { LogOutButton } from "@/components/LogOutButton";
 import { AppHeader } from "@/components/AppHeader";
@@ -119,7 +119,12 @@ function UserSettingsModal(props: { isOpen: boolean; onClose: () => void }) {
 
                         <FormControl isInvalid={"mollieApiKey" in errors} isDisabled={saving || isLoadingUser}>
                             <FormLabel>Mollie API key</FormLabel>
-                            <Input placeholder="example: " type="text" value={mollieApiKey} onChange={(ev) => setMollieApiKey(ev.target.value)} />
+                            <Input
+                                placeholder="example: test_xxxxxxxxxx"
+                                type="text"
+                                value={mollieApiKey}
+                                onChange={(ev) => setMollieApiKey(ev.target.value)}
+                            />
                             {"mollieApiKey" in errors ? (
                                 <FormErrorMessage>{errors["mollieApiKey"]}</FormErrorMessage>
                             ) : (
@@ -165,7 +170,7 @@ export default function HomePage() {
     const router = useRouter();
     const { status: status } = useSession();
     const { data, isLoading } = useSWR<{
-        requests: (PaymentRequest & { usersToPay: { user: User; payedAmount: number; partsOfAmount: number }[] })[];
+        requests: (PaymentRequest & { paidBy: User } & { usersToPay: { user: User; payedAmount: number; partsOfAmount: number }[] })[];
     }>("/api/request", fetcher);
     const { data: user, isLoading: isLoadingUser, mutate: mutateUser } = useSWR<User>("/api/user", fetcher);
     const [loading, setLoading] = useState(false);
@@ -228,25 +233,34 @@ export default function HomePage() {
                                     cursor="pointer"
                                     onClick={() => router.push(`/request/${e.id}`)}>
                                     <CardHeader display="flex" alignItems="center">
-                                        <Heading size="md">{e.name}</Heading>
+                                        <Box>
+                                            <Heading size="md">{e.name}</Heading>
+                                            <Text>{getUserDisplayName(e.paidBy)} paid</Text>
+                                        </Box>
                                         <Spacer />
                                         <Text fontSize="x-large">€{e.amount.toFixed(2)}</Text>
                                     </CardHeader>
                                     <CardBody pt={0}>
-                                        <AvatarGroup size="md" max={8}>
-                                            {e.usersToPay.map((u) => {
-                                                return (
-                                                    <Avatar
-                                                        key={u.user.id}
-                                                        name={u.user.userName || u.user.email}
-                                                        src={u.user.avatarUrl || undefined}>
-                                                        {/* <AvatarBadge boxSize="1.25em" bg={payed ? "green.500" : "red.500"}>
+                                        <Flex alignItems="center" gap={4}>
+                                            <AvatarGroup size="md" max={6}>
+                                                {e.usersToPay.map((u) => {
+                                                    return (
+                                                        <Avatar
+                                                            key={u.user.id}
+                                                            name={u.user.userName || u.user.email}
+                                                            src={u.user.avatarUrl || undefined}>
+                                                            {/* <AvatarBadge boxSize="1.25em" bg={payed ? "green.500" : "red.500"}>
                                                         <FontAwesomeIcon color="white" size="2xs" icon={payed ? faCheck : faTimes} />
                                                     </AvatarBadge> */}
-                                                    </Avatar>
-                                                );
-                                            })}
-                                        </AvatarGroup>
+                                                        </Avatar>
+                                                    );
+                                                })}
+                                            </AvatarGroup>
+                                            <Text color="green.500">
+                                                <FontAwesomeIcon size="xl" icon={faArrowRight} />
+                                            </Text>
+                                            <Avatar name={getUserDisplayName(e.paidBy)} src={e.paidBy.avatarUrl || undefined}></Avatar>
+                                        </Flex>
                                     </CardBody>
                                     {/* <CardFooter>
                                     <Button colorScheme="blue">Edit</Button>
