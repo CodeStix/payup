@@ -78,12 +78,17 @@ export async function notifyPaymentReminders(all: boolean) {
 
     const reminders = await prisma.paymentCheckReminder.findMany({
         where: all
-            ? {}
+            ? { opened: false }
             : {
                   opened: false,
-                  paidDate: {
-                      lt: notifyBefore,
-                  },
+                  OR: [
+                      {
+                          lastNotificationDate: {
+                              lt: notifyBefore,
+                          },
+                      },
+                      { lastNotificationDate: null },
+                  ],
               },
         select: {
             moneyHolder: {
@@ -128,6 +133,7 @@ export async function notifyPaymentReminders(all: boolean) {
                         : getUserDisplayName(reminder.moneyHolder),
                     yesLink: remindLink + "?confirm=yes",
                     noLink: remindLink + "?confirm=no",
+                    paidDate: reminder.paidDate.toLocaleString(),
                 })
             );
         } catch (ex) {
@@ -135,18 +141,16 @@ export async function notifyPaymentReminders(all: boolean) {
         }
     }
 
-    // if (!all) {
-    //     await prisma.paymentCheckReminder.updateMany({
-    //         where: {
-    //             id: {
-    //                 in: reminders.map((e) => e.id),
-    //             },
-    //         },
-    //         data: {
-    //             pending: false,
-    //         },
-    //     });
-    // }
+    await prisma.paymentCheckReminder.updateMany({
+        where: {
+            id: {
+                in: reminders.map((e) => e.id),
+            },
+        },
+        data: {
+            lastNotificationDate: new Date(),
+        },
+    });
 }
 
 export async function notifyUsers(all: boolean) {

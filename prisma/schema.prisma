@@ -94,14 +94,14 @@ model RelativeUserBalance {
 }
 
 model PaymentCheckReminder {
-  id Int @id @default(autoincrement())
+  id                   Int       @id @default(autoincrement())
+  lastNotificationDate DateTime?
 
   moneyHolder     User @relation(fields: [moneyHolderId], references: [id], name: "paymentCheckReminderMoneyHolder")
   moneyHolderId   Int
   moneyReceiver   User @relation(fields: [moneyReceiverId], references: [id], name: "paymentCheckReminderMoneyReceiver")
   moneyReceiverId Int
 
-  // pending        Boolean  @default(true)
   opened     Boolean  @default(false)
   paidDate   DateTime
   paidAmount Float

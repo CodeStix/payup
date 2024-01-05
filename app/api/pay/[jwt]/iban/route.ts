@@ -66,7 +66,7 @@ export async function POST(request: NextRequest, { params }: { params: { jwt: st
             paidAmount: ows,
             opened: false,
             moneyHolderId: jwtPayLoad.h,
-            moneyReceiverId: jwtPayLoad.h,
+            moneyReceiverId: jwtPayLoad.r,
         },
     });
 

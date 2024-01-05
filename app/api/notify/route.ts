@@ -1,4 +1,4 @@
-import { notifyUsers } from "@/notifications";
+import { notifyPaymentReminders, notifyUsers } from "@/notifications";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -7,5 +7,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     await notifyUsers(request.nextUrl.searchParams.get("all") === "1");
+    await notifyPaymentReminders(request.nextUrl.searchParams.get("allReminders") === "1");
+
     return NextResponse.json({});
 }
