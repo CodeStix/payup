@@ -59,6 +59,17 @@ export async function POST(request: NextRequest, { params }: { params: { jwt: st
         },
     });
 
+    // Remind money receiver later about this event
+    await prisma.paymentCheckReminder.create({
+        data: {
+            paidDate: new Date(),
+            paidAmount: ows,
+            opened: false,
+            moneyHolderId: jwtPayLoad.h,
+            moneyReceiverId: jwtPayLoad.h,
+        },
+    });
+
     // if (otherWayBalance) {
     //     await prisma.relativeUserBalance.update({
     //         where: {

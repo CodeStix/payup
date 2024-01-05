@@ -30,8 +30,10 @@ model User {
   // This user is related to because they initiated a connected to this user
   responders UserToUser[] @relation("responders")
 
-  holdsMoneyFrom         RelativeUserBalance[] @relation("relativeBalanceMoneyHolder")
-  shouldReceiveMoneyFrom RelativeUserBalance[] @relation("relativeBalanceMoneyReceiver")
+  holdsMoneyFrom                      RelativeUserBalance[]  @relation("relativeBalanceMoneyHolder")
+  shouldReceiveMoneyFrom              RelativeUserBalance[]  @relation("relativeBalanceMoneyReceiver")
+  holdsMoneyFromCheckReminder         PaymentCheckReminder[] @relation("paymentCheckReminderMoneyHolder")
+  shouldReceiveMoneyFromCheckReminder PaymentCheckReminder[] @relation("paymentCheckReminderMoneyReceiver")
 }
 
 model UserToUser {
@@ -89,4 +91,18 @@ model RelativeUserBalance {
   currentMolliePaymentId String?
 
   @@id([moneyHolderId, moneyReceiverId])
+}
+
+model PaymentCheckReminder {
+  id Int @id @default(autoincrement())
+
+  moneyHolder     User @relation(fields: [moneyHolderId], references: [id], name: "paymentCheckReminderMoneyHolder")
+  moneyHolderId   Int
+  moneyReceiver   User @relation(fields: [moneyReceiverId], references: [id], name: "paymentCheckReminderMoneyReceiver")
+  moneyReceiverId Int
+
+  // pending        Boolean  @default(true)
+  opened     Boolean  @default(false)
+  paidDate   DateTime
+  paidAmount Float
 }
