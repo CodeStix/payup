@@ -122,6 +122,16 @@ export async function notifyPaymentReminders(all: boolean) {
     for (const reminder of reminders) {
         const remindLink = await generatePaymentReminderLink(reminder.id);
 
+        console.log(
+            "Remind",
+            reminder.moneyReceiver.email,
+            "about",
+            reminder.moneyHolder.email,
+            "=",
+            reminder.paidAmount,
+            process.env.NODE_ENV === "development" ? remindLink : ""
+        );
+
         try {
             await sendMail(
                 reminder.moneyReceiver.email,
@@ -214,7 +224,7 @@ export async function notifyUsers(all: boolean) {
         }
 
         if (amount < 0.01) {
-            console.warn("Skipping", moneyHolder, "to", moneyReceiver, "because amount", amount);
+            console.warn("Skipping", moneyHolder.id, "to", moneyReceiver.id, "because amount", amount);
             continue;
         }
 

@@ -233,8 +233,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
             const diff = bodyAmount - existingAmount;
             if (diff !== 0) {
                 // Was adjusted
-                // if (diff >= 0) console.log("Adjusted", [bodyPaidById, bodyUserToPay.userId!], "increment", Math.abs(diff));
-                // else console.log("Adjusted", [bodyUserToPay.userId!, bodyPaidById], "increment", Math.abs(diff));
+                console.log("Adjusted", [bodyUserToPay.userId!, bodyPaidById], "decrement", diff);
 
                 const { firstUserId, secondUserId, amount } = moneyHolderReceiverToUsers(bodyUserToPay.userId!, bodyPaidById, diff);
                 if (firstUserId !== secondUserId)
@@ -261,7 +260,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
             }
         } else {
             // New was added
-            // console.log("Added", [bodyPaidById, bodyUserToPay.userId!], "increment", bodyAmount);
+            console.log("Added", [bodyUserToPay.userId!, bodyPaidById], "increment", bodyAmount);
 
             const { firstUserId, secondUserId, amount } = moneyHolderReceiverToUsers(bodyUserToPay.userId!, bodyPaidById, bodyAmount);
             if (firstUserId !== secondUserId)
@@ -272,7 +271,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                         },
                         update: {
                             amount: {
-                                decrement: amount,
+                                increment: amount,
                             },
                             lastRelatingPaymentRequestId: params.id,
                             lastUpdatedDate: new Date(),
@@ -300,7 +299,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         // );
 
         const deletedAmountToPay = calculateUserAmount(existingTotalParts, existingRequest.amount, deletedUserToPay.partsOfAmount!);
-        // console.log("Deleted", [existingRequest.paidById, deletedUserToPay.userId!], "decrement", deletedAmountToPay);
+        console.log("Deleted", [deletedUserToPay.userId!, existingRequest.paidById], "decrement", deletedAmountToPay);
 
         const { firstUserId, secondUserId, amount } = moneyHolderReceiverToUsers(
             deletedUserToPay.userId!,

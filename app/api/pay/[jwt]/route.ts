@@ -57,7 +57,7 @@ export async function GET(request: NextRequest, { params }: { params: { jwt: str
 
     const { amount, moneyHolder, moneyReceiver } = balanceToMoneyHolderReceiver(balance);
 
-    const paymentMethod = moneyReceiver.mollieApiKey ? "mollie" : "iban";
+    const paymentMethod = (jwtPayLoad.r === moneyReceiver.id ? moneyReceiver : moneyHolder).mollieApiKey ? "mollie" : "iban";
     moneyReceiver.mollieApiKey = null;
     moneyHolder.mollieApiKey = null;
 

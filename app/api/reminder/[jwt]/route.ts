@@ -91,7 +91,7 @@ export async function POST(request: NextRequest, { params }: { params: { jwt: st
                 },
                 data: {
                     amount: {
-                        increment: amount,
+                        decrement: amount,
                     },
                 },
             });
