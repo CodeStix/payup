@@ -70,6 +70,7 @@ export function getEmailHtml(template: string, fields: Record<string, string>) {
 
 const NOTIFY_PAYMENT_REMINDER_INTERVAL_MS = parseInt(process.env.NOTIFY_PAYMENT_REMINDER_INTERVAL_MS || String(1000 * 60 * 60 * 24 * 4));
 const NOTIFY_INTERVAL_MS = parseInt(process.env.NOTIFY_INTERVAL_MS || String(1000 * 60 * 60 * 24 * 2));
+const NOTIFY_NOT_UPDATE_BEFORE_MS = parseInt(process.env.NOTIFY_NOT_UPDATE_BEFORE_MS || String(1000 * 60 * 20));
 
 export async function notifyPaymentReminders(all: boolean) {
     const emailTemplateString = await fs.readFile(REMINDER_EMAIL_TEMPLATE_PATH, { encoding: "utf-8" });
@@ -156,29 +157,15 @@ export async function notifyPaymentReminders(all: boolean) {
 export async function notifyUsers(all: boolean) {
     const emailTemplateString = await fs.readFile(EMAIL_TEMPLATE_PATH, { encoding: "utf-8" });
 
-    const notifyBefore = new Date(new Date().getTime() - NOTIFY_INTERVAL_MS);
-
-    const condition = {
-        amount: {
-            not: 0,
-        },
-        ...(all
-            ? {}
-            : {
-                  OR: [
-                      {
-                          lastNotificationDate: {
-                              lt: notifyBefore,
-                          },
-                      },
-                      { lastNotificationDate: null },
-                  ],
-              }),
-    };
+    const now = new Date();
+    const notifyBeforeMs = now.getTime() - NOTIFY_INTERVAL_MS;
+    const lastUpdatedBeforeMs = now.getTime() - NOTIFY_NOT_UPDATE_BEFORE_MS;
 
     const balances = await prisma.relativeUserBalance.findMany({
-        where: condition,
+        where: {},
         select: {
+            lastUpdatedDate: true,
+            lastNotificationDate: true,
             amount: true,
             moneyHolder: {
                 select: {
@@ -204,19 +191,23 @@ export async function notifyUsers(all: boolean) {
 
     console.log("Found", balances.length, "balances to notify about", all ? "(all)" : "(timed)");
 
-    await prisma.relativeUserBalance.updateMany({
-        where: condition,
-        data: {
-            lastNotificationDate: new Date(),
-        },
-    });
-
     const pairs = new Map<string, (typeof balances)[number]>();
     for (const balance of balances) {
         pairs.set(`${balance.moneyHolder.id}->${balance.moneyReceiver.id}`, balance);
     }
 
+    const notifiedBalances: typeof balances = [];
     for (const balance of balances) {
+        if (!all) {
+            if (
+                (balance.lastNotificationDate && balance.lastNotificationDate.getTime() >= notifyBeforeMs) ||
+                balance.lastUpdatedDate.getTime() >= lastUpdatedBeforeMs
+            ) {
+                // Already notified recently or was recently updated
+                continue;
+            }
+        }
+
         const otherWayBalance = pairs.get(`${balance.moneyReceiver.id}->${balance.moneyHolder.id}`);
 
         if (balance.amount < 0) {
@@ -262,10 +253,30 @@ export async function notifyUsers(all: boolean) {
         } catch (ex) {
             console.error("Could not send mail to", balance.moneyHolder.email, ex);
         }
+
+        notifiedBalances.push(balance);
     }
+
+    console.log("Notified about", notifiedBalances.length, "balances");
+
+    await prisma.relativeUserBalance.updateMany({
+        where: {
+            OR: notifiedBalances.map((e) => ({ moneyReceiverId: e.moneyReceiver.id, moneyHolderId: e.moneyHolder.id })),
+        },
+        data: {
+            lastNotificationDate: now,
+        },
+    });
 }
 
 async function sendMail(receiver: string, subject: string, body: string) {
+    if (process.env.NODE_ENV === "development") {
+        if (!["reddusted@gmail.com", "stijn.rogiest@gmail.com", "stijnvantvijfde@gmail.com"].includes(receiver.toLowerCase())) {
+            console.log("Skipped sending dev mail to", receiver, "about", subject);
+            return;
+        }
+    }
+
     await ses
         .sendEmail({
             Destination: {

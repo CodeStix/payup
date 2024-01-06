@@ -116,6 +116,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
                     amount: {
                         increment: deletedAmountToPay,
                     },
+                    lastUpdatedDate: new Date(),
                 },
                 create: {
                     moneyReceiverId: userToPay.userId!,
@@ -235,6 +236,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                                 increment: Math.abs(diff),
                             },
                             lastRelatingPaymentRequestId: params.id,
+                            lastUpdatedDate: new Date(),
                         },
                         create: {
                             moneyReceiverId: diff >= 0 ? bodyPaidById : bodyUserToPay.userId!,
@@ -262,6 +264,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                             increment: bodyAmount,
                         },
                         lastRelatingPaymentRequestId: params.id,
+                        lastUpdatedDate: new Date(),
                     },
                     create: {
                         moneyReceiverId: bodyPaidById,
@@ -304,6 +307,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                         increment: deletedAmountToPay,
                     },
                     lastRelatingPaymentRequestId: params.id,
+                    lastUpdatedDate: new Date(),
                 },
                 create: {
                     // moneyReceiverId: existingRequest.paidById,
@@ -347,6 +351,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                 name: body.name || undefined,
                 paidById: bodyPaidById,
                 amount: body.amount || undefined,
+                lastUpdateDate: new Date(),
                 usersToPay: body.usersToPay
                     ? {
                           upsert: body.usersToPay.map((u) => ({

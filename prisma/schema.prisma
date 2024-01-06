@@ -83,6 +83,7 @@ model RelativeUserBalance {
   moneyReceiverId Int
 
   amount                       Float           @default(0)
+  lastUpdatedDate              DateTime        @default(now())
   lastPaymentDate              DateTime?
   lastNotificationDate         DateTime?
   lastRelatingPaymentRequest   PaymentRequest? @relation(fields: [lastRelatingPaymentRequestId], references: [id])
