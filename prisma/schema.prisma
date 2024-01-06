@@ -105,7 +105,8 @@ model PaymentCheckReminder {
   moneyReceiver   User @relation(fields: [moneyReceiverId], references: [id], name: "paymentCheckReminderMoneyReceiver")
   moneyReceiverId Int
 
-  opened     Boolean  @default(false)
+  // true if paid, false if didn't pay and null if didn't answer
+  confirmed  Boolean?
   paidDate   DateTime
   paidAmount Float
 }

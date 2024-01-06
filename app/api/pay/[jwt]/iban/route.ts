@@ -61,7 +61,7 @@ export async function POST(request: NextRequest, { params }: { params: { jwt: st
             moneyHolderId: jwtPayLoad.h,
             moneyReceiverId: jwtPayLoad.r,
             paidAmount: amount,
-            opened: false,
+            confirmed: null,
         },
     });
 
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest, { params }: { params: { jwt: st
             data: {
                 paidDate: new Date(),
                 paidAmount: amount,
-                opened: false,
+                confirmed: null,
                 moneyHolderId: jwtPayLoad.h,
                 moneyReceiverId: jwtPayLoad.r,
             },

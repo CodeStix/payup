@@ -39,7 +39,7 @@ export async function GET(request: NextRequest, { params }: { params: { jwt: str
                     id: true,
                 },
             },
-            opened: true,
+            confirmed: true,
             paidAmount: true,
             paidDate: true,
         },
@@ -67,20 +67,16 @@ export async function POST(request: NextRequest, { params }: { params: { jwt: st
     if (!reminder) {
         return NextResponse.json(null, { status: 404 });
     }
-    if (reminder.opened) {
+    if (reminder.confirmed !== null) {
         // Reminder already used
         return NextResponse.json({ message: "Already reopened payment" }, { status: 400 });
     }
 
     const body = (await request.json()) as { paid: boolean };
 
+    const { firstUserId, secondUserId, amount } = moneyHolderReceiverToUsers(reminder.moneyHolderId, reminder.moneyReceiverId, reminder.paidAmount);
     if (body.paid === true) {
         // Register money as paid
-        const { firstUserId, secondUserId, amount } = moneyHolderReceiverToUsers(
-            reminder.moneyHolderId,
-            reminder.moneyReceiverId,
-            reminder.paidAmount
-        );
         if (firstUserId !== secondUserId)
             await prisma.relativeUserBalance.update({
                 where: {
@@ -98,6 +94,19 @@ export async function POST(request: NextRequest, { params }: { params: { jwt: st
                     paymentPageOpenedDate: null,
                 },
             });
+    } else {
+        if (firstUserId !== secondUserId)
+            await prisma.relativeUserBalance.update({
+                where: {
+                    firstUserId_secondUserId: {
+                        firstUserId,
+                        secondUserId,
+                    },
+                },
+                data: {
+                    paymentPageOpenedDate: null,
+                },
+            });
     }
 
     await prisma.paymentCheckReminder.update({
@@ -105,7 +114,7 @@ export async function POST(request: NextRequest, { params }: { params: { jwt: st
             id: jwtPayLoad.m,
         },
         data: {
-            opened: true,
+            confirmed: body.paid === true,
         },
     });
 

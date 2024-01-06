@@ -153,7 +153,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
                 ) : (
                     <></>
                 )}
-                {!shouldPayMoney && <Text>You don't have to pay anymore. You can close this page.</Text>}
+                {!paid && !shouldPayMoney && <Text>You don't have to pay anymore. You can close this page.</Text>}
             </Skeleton>
 
             {/* && (!lastPaymentDate || new Date().getTime() - new Date(lastPaymentDate).getTime() > 60 * 1000) */}
@@ -168,7 +168,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
             )}
 
             <Skeleton isLoaded={!!link}>
-                {shouldPayMoney && (
+                {!paid && shouldPayMoney && (
                     <>
                         {link?.paymentMethod === "mollie" ? (
                             <Button

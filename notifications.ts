@@ -80,17 +80,15 @@ export async function notifyPaymentReminders(all: boolean) {
 
     const reminders = await prisma.paymentCheckReminder.findMany({
         where: all
-            ? { opened: false }
+            ? { confirmed: null }
             : {
-                  opened: false,
-                  OR: [
-                      {
-                          lastNotificationDate: {
-                              lt: notifyBefore,
-                          },
-                      },
-                      { lastNotificationDate: null },
-                  ],
+                  confirmed: null,
+                  lastNotificationDate: {
+                      lt: notifyBefore,
+                  },
+                  paidDate: {
+                      lt: notifyBefore,
+                  },
               },
         select: {
             moneyHolder: {
