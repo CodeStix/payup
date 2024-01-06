@@ -224,7 +224,7 @@ export async function notifyUsers(all: boolean) {
         }
 
         const owsAmount = otherWayBalance ? balance.amount - otherWayBalance.amount : balance.amount;
-        if (owsAmount <= 0) {
+        if (owsAmount < 0.01) {
             // Ows the other way around or doesn't owe anything, skip
             continue;
         }
