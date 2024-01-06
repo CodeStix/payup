@@ -100,6 +100,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import QRCode from "react-qr-code";
+import { balanceToMoneyHolderReceiver } from "@/balance";
 
 export default function PaymentRequestDetailPage({ params }: { params: { id: string } }) {
     const router = useRouter();
@@ -538,15 +539,9 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                                         setManualPaymentMoneyHolder(e.user);
                                         manualPaymentOnOpen();
                                     }}
-                                    onPaymentLink={async (otherWay, instant) => {
-                                        let link;
-                                        if (otherWay) {
-                                            link = await generatePaymentLink(request.paidBy.id, e.user.id);
-                                        } else {
-                                            link = await generatePaymentLink(e.user.id, request.paidBy.id);
-                                        }
-
-                                        if (instant) {
+                                    onPaymentLink={async (moneyHolderId: number, moneyReceiverId: number, shouldOpen: boolean) => {
+                                        const link = await generatePaymentLink(moneyHolderId, moneyReceiverId);
+                                        if (shouldOpen) {
                                             window.open(link, "_blank");
                                         } else {
                                             paymentLinkOnOpen();
@@ -642,7 +637,7 @@ function PayingUserListItem(props: {
     };
     totalParts: number;
     onManualPayment: () => void;
-    onPaymentLink: (otherWay: boolean, instant: boolean) => void;
+    onPaymentLink: (moneyHolderId: number, moneyReceiverId: number, shouldOpen: boolean) => void;
     onChangeFraction: (newFraction: number) => void;
     onRemove: () => void;
     onSetPayingUser: () => void;
@@ -922,19 +917,29 @@ function PaymentLinkModal(props: { isOpen: boolean; onClose: () => void; payment
 function PaymentStatusButton(props: {
     // paidBy: User;
     userToPay: PaymentRequestToUser & {
-        user: User & { holdsMoneyFrom: RelativeUserBalance[]; shouldReceiveMoneyFrom: RelativeUserBalance[] };
+        user: User & {
+            secondUserBalances?: RelativeUserBalance[];
+            firstUserBalances?: RelativeUserBalance[];
+            shouldReceiveMoneyFrom: RelativeUserBalance[];
+        };
     };
     totalParts: number;
     request: PaymentRequest & { paidBy: User };
     isDisabled: boolean;
 
-    onPaymentLink: (otherWay: boolean, instant: boolean) => void;
+    onPaymentLink: (moneyHolderId: number, moneyReceiverId: number, shouldOpen: boolean) => void;
     onManualPayment: () => void;
     onSetPayingUser: () => void;
 }) {
     const { status, data: sessionData } = useSession();
-    const lastPaymentDate = props.userToPay.user.holdsMoneyFrom[0]?.lastPaymentDate;
-    const amount = (props.userToPay.user.holdsMoneyFrom[0]?.amount ?? 0) - (props.userToPay.user.shouldReceiveMoneyFrom[0]?.amount ?? 0);
+    const { amount, lastPaymentDate, moneyHolderId, moneyReceiverId } = balanceToMoneyHolderReceiver(
+        props.userToPay.user.firstUserBalances?.[0] ?? props.userToPay.user.secondUserBalances![0]
+    );
+    const moneyHolder = props.userToPay.userId === moneyHolderId ? props.userToPay.user : props.request.paidBy;
+    const moneyReceiver = props.userToPay.userId === moneyReceiverId ? props.userToPay.user : props.request.paidBy;
+    const even = amount < 0.01;
+
+    console.log({ moneyHolder, moneyReceiver });
 
     return (
         <Popover>
@@ -953,46 +958,40 @@ function PaymentStatusButton(props: {
                 <PopoverCloseButton />
                 <PopoverHeader>Payment status</PopoverHeader>
                 <PopoverBody display="flex" gap={2} flexDir="column">
-                    {Math.abs(amount) < 0.01 ? (
+                    {even ? (
                         <Text as="p" color="green.500" fontWeight="semibold">
-                            <FontAwesomeIcon icon={faCheckCircle} /> {getUserDisplayName(props.request.paidBy, sessionData?.user)} and{" "}
-                            {getUserDisplayName(props.userToPay.user, sessionData?.user)} are even
-                        </Text>
-                    ) : amount >= 0.01 ? (
-                        <Text as="p" color="yellow.500" fontWeight="semibold">
-                            <FontAwesomeIcon icon={faExclamationTriangle} /> {getUserDisplayName(props.userToPay.user, sessionData?.user)} still ows{" "}
-                            {getUserDisplayName(props.request.paidBy, sessionData?.user)} €{amount.toFixed(2)}
+                            <FontAwesomeIcon icon={faCheckCircle} /> {getUserDisplayName(moneyReceiver, sessionData?.user)} and{" "}
+                            {getUserDisplayName(moneyHolder, sessionData?.user)} are even
                         </Text>
                     ) : (
                         <Text as="p" color="yellow.500" fontWeight="semibold">
-                            <FontAwesomeIcon icon={faExclamationTriangle} /> {getUserDisplayName(props.request.paidBy, sessionData?.user)} still ows{" "}
-                            {getUserDisplayName(props.userToPay.user, sessionData?.user)} €{-amount.toFixed(2)} back
+                            <FontAwesomeIcon icon={faExclamationTriangle} /> {getUserDisplayName(moneyHolder, sessionData?.user)} still ows{" "}
+                            {getUserDisplayName(moneyReceiver, sessionData?.user)} €{amount.toFixed(2)}
                         </Text>
                     )}
 
-                    {amount >= 0.01 && (
+                    {!even && (
                         <Text as="p" opacity={0.5}>
-                            {getUserDisplayName(props.userToPay.user, sessionData?.user)} will be notified periodically (weekly) if they haven&apos;t
-                            paid. You can also share a payment link/pay by pressing the green button.
+                            {getUserDisplayName(moneyHolder, sessionData?.user)} will be notified periodically (weekly) if they haven&apos;t paid. You
+                            can also share a payment link/pay by pressing the green button.
                         </Text>
                     )}
 
                     <Divider />
 
-                    {(amount <= -0.01 && sessionData?.user?.email === props.request.paidBy.email) ||
-                    (amount >= 0.01 && sessionData?.user?.email === props.userToPay.user.email) ? (
+                    {!even && moneyHolder.email === sessionData?.user?.email ? (
                         <Button
                             isDisabled={props.isDisabled}
-                            onClick={() => props.onPaymentLink(amount < 0, true)}
+                            onClick={() => props.onPaymentLink(moneyHolder.id, moneyReceiver.id, true)}
                             colorScheme="green"
                             rightIcon={<FontAwesomeIcon icon={faArrowRight} />}>
                             Pay back now
                         </Button>
-                    ) : Math.abs(amount) >= 0.01 ? (
+                    ) : !even ? (
                         <Button
                             variant="solid"
                             isDisabled={props.isDisabled}
-                            onClick={() => props.onPaymentLink(amount < 0, false)}
+                            onClick={() => props.onPaymentLink(moneyHolder.id, moneyReceiver.id, false)}
                             colorScheme="green"
                             // size="sm"
                             leftIcon={<FontAwesomeIcon icon={faLink} />}>
@@ -1002,7 +1001,7 @@ function PaymentStatusButton(props: {
                         <></>
                     )}
 
-                    {props.userToPay.userId !== props.request.paidById && (
+                    {moneyHolder.id !== moneyReceiver.id && (
                         <Button
                             isDisabled={props.isDisabled}
                             variant="ghost"
@@ -1014,7 +1013,7 @@ function PaymentStatusButton(props: {
                         </Button>
                     )}
 
-                    {props.request.paidBy.id !== props.userToPay.userId && (
+                    {moneyReceiver.id !== moneyHolder.id && (
                         <Button
                             isDisabled={props.isDisabled}
                             variant="ghost"

@@ -56,6 +56,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
                                 select: {
                                     amount: true,
                                     lastPaymentDate: true,
+                                    firstUserId: true,
+                                    secondUserId: true,
                                 },
                             },
                             secondUserBalances: {
@@ -65,6 +67,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
                                 select: {
                                     amount: true,
                                     lastPaymentDate: true,
+                                    firstUserId: true,
+                                    secondUserId: true,
                                 },
                             },
                         },
@@ -389,6 +393,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                                     select: {
                                         amount: true,
                                         lastPaymentDate: true,
+                                        firstUserId: true,
+                                        secondUserId: true,
                                     },
                                 },
                                 secondUserBalances: {
@@ -398,6 +404,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                                     select: {
                                         amount: true,
                                         lastPaymentDate: true,
+                                        firstUserId: true,
+                                        secondUserId: true,
                                     },
                                 },
                             },

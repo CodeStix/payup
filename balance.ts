@@ -13,9 +13,7 @@ export function moneyHolderReceiverToUsers(moneyHolder: number | Pick<User, "id"
 }
 
 export function balanceToMoneyHolderReceiver<
-    B extends Pick<RelativeUserBalance, "amount"> & {
-        firstUserId?: number;
-        secondUserId?: number;
+    B extends Partial<RelativeUserBalance> & {
         firstUser?: Partial<User>;
         secondUser?: Partial<User>;
     }
@@ -31,5 +29,6 @@ export function balanceToMoneyHolderReceiver<
         moneyReceiverId: (flip ? balance.firstUserId : balance.secondUserId) as number,
         moneyHolderId: (flip ? balance.secondUserId : balance.firstUserId) as number,
         amount: Math.abs(balance.amount),
+        lastPaymentDate: balance.lastPaymentDate,
     };
 }
