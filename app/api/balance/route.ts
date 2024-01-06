@@ -81,6 +81,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                 },
                 data: {
                     lastPaymentDate: new Date(),
+                    lastUpdatedDate: new Date(),
+                    paymentPageOpenedDate: null,
                     amount: {
                         increment: amount,
                     },

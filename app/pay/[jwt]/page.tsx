@@ -36,6 +36,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
     const amount = link?.balance.amount ?? null;
     const paid = amount !== null && amount < 0.01;
     const shouldPayMoney = link?.user.id === link?.balance.moneyHolder.id;
+    const previouslyOpenedAt = link?.balance.paymentPageOpenedDate ? new Date(link.balance.paymentPageOpenedDate) : null;
 
     const searchParams = useSearchParams();
 
@@ -95,30 +96,34 @@ export default function Home({ params }: { params: { jwt: string } }) {
             <AppText />
 
             <Skeleton isLoaded={!!link}>
-                {link?.paymentMethod === "mollie" ? (
-                    <>
-                        {paid ? (
-                            searchParams.get("status") === "paid" ? (
-                                <Heading color="green.500" textAlign="center">
-                                    <Confetti />
-                                    You just paid {link.balance.moneyReceiver && getUserDisplayName(link.balance.moneyReceiver)}!
-                                </Heading>
-                            ) : (
-                                <Heading color="green.500" textAlign="center">
-                                    You already paid {link.balance.moneyReceiver && getUserDisplayName(link.balance.moneyReceiver)}!
-                                </Heading>
-                            )
-                        ) : !shouldPayMoney ? (
-                            <Heading as="h2" color="yellow.500" textAlign="center">
-                                {link.balance.moneyHolder && getUserDisplayName(link.balance.moneyHolder)} still ows you €
-                                {link.balance.amount?.toFixed(2)}!
-                            </Heading>
-                        ) : (
-                            <Heading as="h2" textAlign="center">
-                                You still owe {link.balance.moneyReceiver && getUserDisplayName(link.balance.moneyReceiver)} €{amount?.toFixed(2)}!
-                            </Heading>
-                        )}
-                    </>
+                {paid ? (
+                    searchParams.get("status") === "paid" ? (
+                        <Heading color="green.500" textAlign="center">
+                            <Confetti />
+                            You just paid {link?.balance.moneyReceiver && getUserDisplayName(link.balance.moneyReceiver)}!
+                        </Heading>
+                    ) : (
+                        <Heading color="green.500" textAlign="center">
+                            You and {link?.balance.moneyReceiver && getUserDisplayName(link.balance.moneyReceiver)} are even!
+                        </Heading>
+                    )
+                ) : !shouldPayMoney ? (
+                    <Heading as="h2" color="yellow.500" textAlign="center">
+                        {link?.balance.moneyHolder && getUserDisplayName(link.balance.moneyHolder)} still ows you €{link?.balance.amount?.toFixed(2)}!
+                    </Heading>
+                ) : link?.paymentMethod === "iban" && previouslyOpenedAt ? (
+                    <Heading color="yellow.500" textAlign="center">
+                        You could still be owing €{link?.amount?.toFixed(2)} to{" "}
+                        {link?.balance.moneyReceiver && getUserDisplayName(link.balance.moneyReceiver)}!
+                    </Heading>
+                ) : (
+                    <Heading as="h2" textAlign="center">
+                        You still owe {link?.balance.moneyReceiver && getUserDisplayName(link.balance.moneyReceiver)} €{amount?.toFixed(2)}!
+                    </Heading>
+                )}
+
+                {/* {link?.paymentMethod === "mollie" ? (
+                    <></>
                 ) : (
                     <>
                         {paid ? (
@@ -137,22 +142,28 @@ export default function Home({ params }: { params: { jwt: string } }) {
                             </Heading>
                         )}
                     </>
-                )}
+                )} */}
             </Skeleton>
 
             <Skeleton isLoaded={!!link} textAlign="center">
-                {link?.balance.lastRelatingPaymentRequest && <Text>For {link.balance.lastRelatingPaymentRequest.name}.</Text>}
-                {!shouldPayMoney && <Text>Until now, you don't have to pay anymore. You can close this page.</Text>}
+                {paid ? (
+                    <Text>You don't have to do anything. You can close this page.</Text>
+                ) : link?.balance.lastRelatingPaymentRequest ? (
+                    <Text>For {link.balance.lastRelatingPaymentRequest.name}.</Text>
+                ) : (
+                    <></>
+                )}
+                {!shouldPayMoney && <Text>You don't have to pay anymore. You can close this page.</Text>}
             </Skeleton>
 
             {/* && (!lastPaymentDate || new Date().getTime() - new Date(lastPaymentDate).getTime() > 60 * 1000) */}
-            {link?.paymentMethod === "iban" && paid && shouldPayMoney && (
+            {link?.paymentMethod === "iban" && previouslyOpenedAt && (
                 <Alert status="warning" rounded="lg" w="xs" flexDir="column" textAlign="center">
                     <Flex>
                         <AlertIcon />
                         <AlertTitle>You already paid?</AlertTitle>
                     </Flex>
-                    You already opened this link{lastPaymentDate && <> at {new Date(lastPaymentDate).toLocaleString()}</>}.
+                    You already opened this link{previouslyOpenedAt && <> at {previouslyOpenedAt.toLocaleString()}</>}.
                 </Alert>
             )}
 

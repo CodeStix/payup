@@ -74,6 +74,7 @@ export async function GET(request: NextRequest, { params }: { params: { jwt: str
                     },
                     lastPaymentDate: new Date(),
                     currentMolliePaymentId: null,
+                    paymentPageOpenedDate: null,
                 },
             });
     }

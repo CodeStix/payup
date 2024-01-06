@@ -74,8 +74,8 @@ export async function POST(request: NextRequest, { params }: { params: { jwt: st
 
     const body = (await request.json()) as { paid: boolean };
 
-    if (body.paid === false) {
-        // Re-create money difference
+    if (body.paid === true) {
+        // Register money as paid
         const { firstUserId, secondUserId, amount } = moneyHolderReceiverToUsers(
             reminder.moneyHolderId,
             reminder.moneyReceiverId,
@@ -91,8 +91,11 @@ export async function POST(request: NextRequest, { params }: { params: { jwt: st
                 },
                 data: {
                     amount: {
-                        decrement: amount,
+                        increment: amount,
                     },
+                    lastPaymentDate: new Date(),
+                    lastUpdatedDate: new Date(),
+                    paymentPageOpenedDate: null,
                 },
             });
     }

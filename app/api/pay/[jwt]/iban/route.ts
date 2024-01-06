@@ -38,8 +38,8 @@ export async function POST(request: NextRequest, { params }: { params: { jwt: st
     if (moneyHolderId !== jwtPayLoad.h || moneyReceiverId !== jwtPayLoad.r) {
         return NextResponse.json({ message: "Other way around" }, { status: 400 });
     }
-
-    const { amount: incAmount } = moneyHolderReceiverToUsers(moneyHolderId, moneyReceiverId, amount);
+    //
+    // const { amount: incAmount } = moneyHolderReceiverToUsers(moneyHolderId, moneyReceiverId, amount);
     if (firstUserId !== secondUserId)
         await prisma.relativeUserBalance.update({
             where: {
@@ -49,23 +49,36 @@ export async function POST(request: NextRequest, { params }: { params: { jwt: st
                 },
             },
             data: {
-                lastPaymentDate: new Date(),
-                amount: {
-                    increment: incAmount,
-                },
+                paymentPageOpenedDate: new Date(),
+                // amount: {
+                //     increment: incAmount,
+                // },
             },
         });
 
-    // Remind money receiver later about this event
-    await prisma.paymentCheckReminder.create({
-        data: {
-            paidDate: new Date(),
-            paidAmount: amount,
-            opened: false,
+    const existingReminder = await prisma.paymentCheckReminder.findFirst({
+        where: {
             moneyHolderId: jwtPayLoad.h,
             moneyReceiverId: jwtPayLoad.r,
+            paidAmount: amount,
+            opened: false,
         },
     });
+
+    // Remind money receiver later about this event
+    if (!existingReminder) {
+        await prisma.paymentCheckReminder.create({
+            data: {
+                paidDate: new Date(),
+                paidAmount: amount,
+                opened: false,
+                moneyHolderId: jwtPayLoad.h,
+                moneyReceiverId: jwtPayLoad.r,
+            },
+        });
+    } else {
+        console.log("Not creating another reminder for", [jwtPayLoad.h, jwtPayLoad.r], "=", amount);
+    }
 
     return NextResponse.json({ message: "Done" });
 }

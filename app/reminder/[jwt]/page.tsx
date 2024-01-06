@@ -50,8 +50,6 @@ export default function Home({ params }: { params: { jwt: string } }) {
         }
     }, [reminder, paid]);
 
-    console.log("reminder", isLoadingReminder, loading, reminder);
-
     return (
         <Center style={{ height: "100%", flexDirection: "column", gap: "1em" }} p={4}>
             <AppText />

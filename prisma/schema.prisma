@@ -85,6 +85,7 @@ model RelativeUserBalance {
   // The amount that secondUser should receive from firstUser
   amount                       Float           @default(0)
   lastUpdatedDate              DateTime        @default(now())
+  paymentPageOpenedDate        DateTime?
   lastPaymentDate              DateTime?
   lastNotificationDate         DateTime?
   lastRelatingPaymentRequest   PaymentRequest? @relation(fields: [lastRelatingPaymentRequestId], references: [id])

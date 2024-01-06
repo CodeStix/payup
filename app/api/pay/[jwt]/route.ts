@@ -48,6 +48,7 @@ export async function GET(request: NextRequest, { params }: { params: { jwt: str
                     name: true,
                 },
             },
+            paymentPageOpenedDate: true,
         },
     });
 
