@@ -263,7 +263,7 @@ export default function HomePage() {
                                                 <FontAwesomeIcon size="xl" icon={faArrowRight} />
                                             </Text>
                                             <Tooltip openDelay={200} label={getUserDisplayName(e.paidBy)}>
-                                                <Avatar name={getUserDisplayName(e.paidBy)} src={e.paidBy.avatarUrl || undefined}></Avatar>
+                                                <Avatar name={e.paidBy.userName || e.paidBy.email} src={e.paidBy.avatarUrl || undefined}></Avatar>
                                             </Tooltip>
                                         </Flex>
                                     </CardBody>

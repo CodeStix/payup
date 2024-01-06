@@ -461,7 +461,7 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                             {filteredSearchResults.map((u) => (
                                 <ListItem my={1} display="flex" key={u.id} alignItems="center" gap={2}>
                                     <Tooltip label={u.email} openDelay={200}>
-                                        <Avatar size="sm" name={getUserDisplayName(u)} src={u.avatarUrl || undefined} />
+                                        <Avatar size="sm" name={u.userName || u.email} src={u.avatarUrl || undefined} />
                                     </Tooltip>
 
                                     <Tooltip label={u.email} openDelay={200}>
@@ -503,11 +503,11 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
 
                         <Flex alignItems="center" gap={2} my={1}>
                             {request?.paidBy && (
-                                <Tooltip label={request?.paidBy.email ?? ""} openDelay={200}>
+                                <Tooltip label={request.paidBy.email ?? ""} openDelay={200}>
                                     <Avatar
                                         size="sm"
-                                        name={getUserDisplayName(request?.paidBy, sessionData?.user)}
-                                        src={request?.paidBy.avatarUrl ?? undefined}
+                                        name={request.paidBy.userName || request.paidBy.email}
+                                        src={request.paidBy.avatarUrl ?? undefined}
                                     />
                                 </Tooltip>
                             )}

@@ -125,7 +125,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
                         Logged in as{" "}
                         <Avatar
                             size="xs"
-                            name={getUserDisplayName(reminder.moneyReceiver)}
+                            name={reminder.moneyReceiver.userName || reminder.moneyReceiver.email}
                             src={reminder.moneyReceiver.avatarUrl || undefined}></Avatar>{" "}
                         {getUserDisplayName(reminder.moneyReceiver)}.{" "}
                         <Button onClick={() => alert("This page is not meant for you, please close it")} variant="link">
