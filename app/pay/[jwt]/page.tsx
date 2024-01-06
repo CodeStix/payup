@@ -156,7 +156,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
                 </Alert>
             )}
 
-            <Skeleton isLoaded={!!link} h="20px" w="200px">
+            <Skeleton isLoaded={!!link}>
                 {shouldPayMoney && (
                     <>
                         {link?.paymentMethod === "mollie" ? (

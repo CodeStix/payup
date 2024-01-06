@@ -57,12 +57,12 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     if (typeof body.amount !== "number" || typeof body.moneyHolderId !== "number" || typeof body.moneyReceiverId !== "number") {
         return NextResponse.json(null, { status: 400 });
     }
-    if (Math.abs(body.amount) < 0.01) {
+    if (body.amount < 0.01) {
         return NextResponse.json(null);
     }
 
     try {
-        const { firstUserId, secondUserId, amount, moneyHolderKey } = moneyHolderReceiverToUsers(
+        const { firstUserId, secondUserId, amount, moneyReceiverKey } = moneyHolderReceiverToUsers(
             body.moneyHolderId,
             body.moneyReceiverId,
             body.amount
@@ -75,7 +75,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                         firstUserId: firstUserId,
                         secondUserId: secondUserId,
                     },
-                    [moneyHolderKey]: {
+                    [moneyReceiverKey]: {
                         OR: [{ allowOtherUserManualTranser: true }, { email: session.user.email }],
                     },
                 },

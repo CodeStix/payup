@@ -91,6 +91,8 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
         return NextResponse.json({}, { status: 401 });
     }
 
+    const body = (await request.json()) as { recalculatePaymentRemoved: boolean };
+
     await prisma.$transaction(async (prisma) => {
         const deletedRequest = await prisma.paymentRequest.delete({
             where: {
@@ -108,28 +110,33 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
             },
         });
 
-        const totalParts = getTotalParts(deletedRequest.usersToPay);
-
-        for (const userToPay of deletedRequest.usersToPay) {
-            const deletedAmountToPay = calculateUserAmount(totalParts, deletedRequest.amount, userToPay.partsOfAmount!);
-            const { amount, firstUserId, secondUserId } = moneyHolderReceiverToUsers(deletedRequest.paidById, userToPay.userId!, deletedAmountToPay);
-            if (firstUserId !== secondUserId)
-                await prisma.relativeUserBalance.upsert({
-                    where: {
-                        firstUserId_secondUserId: { firstUserId, secondUserId },
-                    },
-                    update: {
-                        amount: {
-                            increment: amount,
+        if (body.recalculatePaymentRemoved) {
+            const totalParts = getTotalParts(deletedRequest.usersToPay);
+            for (const userToPay of deletedRequest.usersToPay) {
+                const deletedAmountToPay = calculateUserAmount(totalParts, deletedRequest.amount, userToPay.partsOfAmount!);
+                const { amount, firstUserId, secondUserId } = moneyHolderReceiverToUsers(
+                    deletedRequest.paidById,
+                    userToPay.userId!,
+                    deletedAmountToPay
+                );
+                if (firstUserId !== secondUserId)
+                    await prisma.relativeUserBalance.upsert({
+                        where: {
+                            firstUserId_secondUserId: { firstUserId, secondUserId },
                         },
-                        lastUpdatedDate: new Date(),
-                    },
-                    create: {
-                        firstUserId,
-                        secondUserId,
-                        amount: 0,
-                    },
-                });
+                        update: {
+                            amount: {
+                                decrement: amount,
+                            },
+                            lastUpdatedDate: new Date(),
+                        },
+                        create: {
+                            firstUserId,
+                            secondUserId,
+                            amount: 0,
+                        },
+                    });
+            }
         }
     });
 
@@ -238,7 +245,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                             },
                             update: {
                                 amount: {
-                                    increment: amount,
+                                    decrement: amount,
                                 },
                                 lastRelatingPaymentRequestId: params.id,
                                 lastUpdatedDate: new Date(),
@@ -246,7 +253,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                             create: {
                                 firstUserId,
                                 secondUserId,
-                                amount: amount,
+                                amount: -amount,
                                 lastRelatingPaymentRequestId: params.id,
                             },
                         })
@@ -265,7 +272,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                         },
                         update: {
                             amount: {
-                                increment: amount,
+                                decrement: amount,
                             },
                             lastRelatingPaymentRequestId: params.id,
                             lastUpdatedDate: new Date(),
@@ -331,6 +338,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
             prismaOperations.push(
                 prisma.paymentRequestToUser.deleteMany({
                     where: {
+                        paymentRequestId: params.id,
                         userId: {
                             in: Array.from(toDelete),
                         },

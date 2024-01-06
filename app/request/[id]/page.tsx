@@ -307,6 +307,7 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
         try {
             const res = await fetch(`/api/request/${request.id}`, {
                 method: "DELETE",
+                body: JSON.stringify({}),
             });
             if (res.ok) {
                 router.back();
@@ -722,6 +723,7 @@ function PayingUserListItem(props: {
 }
 
 function ManualPaymentModal(props: { isOpen: boolean; onClose: () => void; moneyHolder: User; onSubmit: () => void; moneyReceiver: User }) {
+    const { data } = useSession();
     const [direction, setDirection] = useState<null | boolean>(null);
     const [amount, setAmount] = useState("0");
     const [submitting, setSubmitting] = useState(false);
@@ -734,9 +736,9 @@ function ManualPaymentModal(props: { isOpen: boolean; onClose: () => void; money
             const res = await fetch("/api/balance", {
                 method: "PATCH",
                 body: JSON.stringify({
-                    amount: direction ? -parseFloat(amount) : parseFloat(amount),
-                    moneyHolderId: props.moneyHolder.id,
-                    moneyReceiverId: props.moneyReceiver.id,
+                    amount: parseFloat(amount),
+                    moneyHolderId: direction ? props.moneyHolder.id : props.moneyReceiver.id,
+                    moneyReceiverId: direction ? props.moneyReceiver.id : props.moneyHolder.id,
                 }),
             });
             if (res.ok) {
@@ -783,10 +785,10 @@ function ManualPaymentModal(props: { isOpen: boolean; onClose: () => void; money
                                     <Avatar
                                         mx={1}
                                         size="xs"
-                                        name={getUserDisplayName(props.moneyHolder)}
+                                        name={props.moneyHolder.userName || props.moneyHolder.email}
                                         src={props.moneyHolder.avatarUrl || undefined}
                                     />{" "}
-                                    {getUserDisplayName(props.moneyHolder)}
+                                    {getUserDisplayName(props.moneyHolder, data?.user)}
                                 </Text>
                                 <Flex gap={2} alignItems="center">
                                     <Text opacity={direction === true ? 0.5 : 0}>€ {amount}</Text>
@@ -813,10 +815,10 @@ function ManualPaymentModal(props: { isOpen: boolean; onClose: () => void; money
                                     <Avatar
                                         mx={1}
                                         size="xs"
-                                        name={getUserDisplayName(props.moneyReceiver)}
+                                        name={props.moneyReceiver.userName || props.moneyReceiver.email}
                                         src={props.moneyReceiver.avatarUrl || undefined}
                                     />{" "}
-                                    {getUserDisplayName(props.moneyReceiver)}
+                                    {getUserDisplayName(props.moneyReceiver, data?.user)}
                                 </Text>
                             </Flex>
                         </FormControl>

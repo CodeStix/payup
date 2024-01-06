@@ -61,8 +61,8 @@ export async function GET(request: NextRequest, { params }: { params: { jwt: str
     }
 
     if (molliePayment.status === PaymentStatus.paid) {
-        const molliePaid = parseInt(molliePayment.amount.value);
-        const { amount: decAmount } = moneyHolderReceiverToUsers(moneyHolder, moneyReceiver, molliePaid);
+        const molliePaid = parseFloat(molliePayment.amount.value);
+        const { amount: incAmount } = moneyHolderReceiverToUsers(moneyHolder, moneyReceiver, molliePaid);
         if (firstUserId !== secondUserId)
             await prisma.relativeUserBalance.update({
                 where: {
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest, { params }: { params: { jwt: str
                 },
                 data: {
                     amount: {
-                        decrement: decAmount,
+                        increment: incAmount,
                     },
                     lastPaymentDate: new Date(),
                     currentMolliePaymentId: null,

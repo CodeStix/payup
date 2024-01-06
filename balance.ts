@@ -8,7 +8,8 @@ export function moneyHolderReceiverToUsers(moneyHolder: number | Pick<User, "id"
         firstUserId: flip ? moneyReceiverId : moneyHolderId,
         secondUserId: flip ? moneyHolderId : moneyReceiverId,
         amount: flip ? -amount : amount,
-        moneyHolderKey: (flip ? "secondUserId" : "firstUser") as "secondUserId" | "firstUser",
+        moneyHolderKey: (flip ? "secondUser" : "firstUser") as "secondUser" | "firstUser",
+        moneyReceiverKey: (!flip ? "secondUser" : "firstUser") as "secondUser" | "firstUser",
     };
 }
 
