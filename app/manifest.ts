@@ -7,16 +7,17 @@ export default function manifest(): MetadataRoute.Manifest {
         description: "Automatically get paid and reminded about payments.",
         start_url: "/",
         display: "standalone",
-        background_color: "#fff",
-        theme_color: "#dd6b20",
+        background_color: "#ffffff",
+        // theme_color: "#dd6b20",
+        theme_color: "#ffffff",
         icons: [
-            {
-                src: "/orange_96.png",
-                sizes: "96x96",
-            },
             {
                 src: "/orange_256.png",
                 sizes: "256x256",
+            },
+            {
+                src: "/orange_96.png",
+                sizes: "96x96",
             },
             {
                 src: "/orange.svg",

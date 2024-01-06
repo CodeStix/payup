@@ -5,6 +5,59 @@ import { NextRequest, NextResponse } from "next/server";
 
 const prisma = new PrismaClient();
 
+export async function GET(request: NextRequest, { params }: { params: { id: string } }): Promise<NextResponse> {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+        return NextResponse.json({}, { status: 401 });
+    }
+
+    const balances = await prisma.relativeUserBalance.findMany({
+        where: {
+            OR: [{ moneyHolder: { email: session.user.email } }, { moneyReceiver: { email: session.user.email } }],
+        },
+        select: {
+            amount: true,
+            lastRelatingPaymentRequest: {
+                select: {
+                    id: true,
+                    name: true,
+                },
+            },
+            moneyReceiver: {
+                select: {
+                    id: true,
+                    userName: true,
+                    email: true,
+                    avatarUrl: true,
+                },
+            },
+            moneyHolder: {
+                select: {
+                    id: true,
+                    userName: true,
+                    email: true,
+                    avatarUrl: true,
+                },
+            },
+        },
+    });
+
+    const pairs = new Map<string, (typeof balances)[number]>();
+    for (const balance of balances) {
+        pairs.set(`${balance.moneyHolder.id}->${balance.moneyReceiver.id}`, balance);
+    }
+
+    for (const balance of balances) {
+
+        if(balance.moneyHolder.id) {
+            
+        }
+
+    }
+
+    return NextResponse.json(balances);
+}
+
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }): Promise<NextResponse> {
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {

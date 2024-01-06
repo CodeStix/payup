@@ -12,23 +12,28 @@ const rubik = Rubik({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
     title: "Pay Up!",
-    description: "Automatic payment reminding app using notifications",
+    description: "Automatically get paid and reminded about payments.",
+    openGraph: {
+        type: "website",
+        title: "Pay Up!",
+        description: "Automatically get paid and reminded about payments.",
+        url: "https://payup.money",
+        images: ["https://payup.money/orange_256.png"],
+        siteName: "Pay Up!",
+    },
+    appleWebApp: { statusBarStyle: "default", title: "Pay Up!", capable: true, startupImage: "https://payup.money/orange_256.png" },
+    keywords: ["pay", "reminder", "notification", "payment request", "payment", "request", "auto", "automatically", "balance", "friends"],
+    applicationName: "Pay Up!",
+    creator: "weboot",
+    icons: [
+        { rel: "icon", url: "https://payup.money/orange_256.png" },
+        { rel: "apple-touch-icon", url: "https://payup.money/orange_256.png" },
+    ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
     return (
         <html lang="en">
-            <head>
-                <meta name="theme-color" content="#dd6b20" />
-                <meta name="description" content="Automatically get paid and reminded about payments." />
-                <link rel="apple-touch-icon" href="/orange_96.png" />
-                <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-                <meta property="og:title" content="Pay Up!" />
-                <meta property="og:description" content="Automatically get paid and reminded about payments." />
-                <meta property="og:url" content="https://payup.weboot.nl/" />
-                {/* <meta property="og:image" content="https://payup.weboot.nl/banner.jpg" /> */}
-                <title>Pay Up!</title>
-            </head>
             <body className={rubik.className}>
                 <Providers>{children}</Providers>
             </body>
