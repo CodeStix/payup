@@ -32,6 +32,7 @@ import {
     Input,
     useDisclosure,
     Switch,
+    Tooltip,
 } from "@chakra-ui/react";
 import type { PaymentRequest, User } from "@prisma/client";
 import { faArrowRight, faCheck, faPlus, faTimes, faUserCog } from "@fortawesome/free-solid-svg-icons";
@@ -242,24 +243,28 @@ export default function HomePage() {
                                     </CardHeader>
                                     <CardBody pt={0}>
                                         <Flex alignItems="center" gap={4}>
-                                            <AvatarGroup size="md" max={6}>
-                                                {e.usersToPay.map((u) => {
-                                                    return (
-                                                        <Avatar
-                                                            key={u.user.id}
-                                                            name={u.user.userName || u.user.email}
-                                                            src={u.user.avatarUrl || undefined}>
-                                                            {/* <AvatarBadge boxSize="1.25em" bg={payed ? "green.500" : "red.500"}>
+                                            <Tooltip openDelay={200} label={e.usersToPay.map((e) => getUserDisplayName(e.user)).join(", ")}>
+                                                <AvatarGroup size="md" max={5}>
+                                                    {e.usersToPay.map((u) => {
+                                                        return (
+                                                            <Avatar
+                                                                key={u.user.id}
+                                                                name={u.user.userName || u.user.email}
+                                                                src={u.user.avatarUrl || undefined}>
+                                                                {/* <AvatarBadge boxSize="1.25em" bg={payed ? "green.500" : "red.500"}>
                                                         <FontAwesomeIcon color="white" size="2xs" icon={payed ? faCheck : faTimes} />
                                                     </AvatarBadge> */}
-                                                        </Avatar>
-                                                    );
-                                                })}
-                                            </AvatarGroup>
-                                            <Text color="green.500">
+                                                            </Avatar>
+                                                        );
+                                                    })}
+                                                </AvatarGroup>
+                                            </Tooltip>
+                                            <Text>
                                                 <FontAwesomeIcon size="xl" icon={faArrowRight} />
                                             </Text>
-                                            <Avatar name={getUserDisplayName(e.paidBy)} src={e.paidBy.avatarUrl || undefined}></Avatar>
+                                            <Tooltip openDelay={200} label={getUserDisplayName(e.paidBy)}>
+                                                <Avatar name={getUserDisplayName(e.paidBy)} src={e.paidBy.avatarUrl || undefined}></Avatar>
+                                            </Tooltip>
                                         </Flex>
                                     </CardBody>
                                     {/* <CardFooter>
