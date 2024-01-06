@@ -68,23 +68,24 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
             body.amount
         );
 
-        await prisma.relativeUserBalance.update({
-            where: {
-                firstUserId_secondUserId: {
-                    firstUserId: firstUserId,
-                    secondUserId: secondUserId,
+        if (firstUserId !== secondUserId)
+            await prisma.relativeUserBalance.update({
+                where: {
+                    firstUserId_secondUserId: {
+                        firstUserId: firstUserId,
+                        secondUserId: secondUserId,
+                    },
+                    [moneyHolderKey]: {
+                        OR: [{ allowOtherUserManualTranser: true }, { email: session.user.email }],
+                    },
                 },
-                [moneyHolderKey]: {
-                    OR: [{ allowOtherUserManualTranser: true }, { email: session.user.email }],
+                data: {
+                    lastPaymentDate: new Date(),
+                    amount: {
+                        increment: amount,
+                    },
                 },
-            },
-            data: {
-                lastPaymentDate: new Date(),
-                amount: {
-                    increment: amount,
-                },
-            },
-        });
+            });
     } catch (ex) {
         console.error("Could not add manual balance", ex);
         return NextResponse.json({}, { status: 400 });

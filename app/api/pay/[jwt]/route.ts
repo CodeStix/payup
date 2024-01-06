@@ -57,21 +57,19 @@ export async function GET(request: NextRequest, { params }: { params: { jwt: str
 
     const { amount, moneyHolder, moneyReceiver } = balanceToMoneyHolderReceiver(balance);
 
+    const paymentMethod = moneyReceiver.mollieApiKey ? "mollie" : "iban";
+    moneyReceiver.mollieApiKey = null;
+    moneyHolder.mollieApiKey = null;
+
     return NextResponse.json({
         balance: {
             ...balance,
             amount: amount,
-            moneyReceiver: {
-                ...moneyReceiver,
-                mollieApiKey: undefined,
-            },
-            moneyHolder: {
-                ...moneyHolder,
-                mollieApiKey: undefined,
-            },
+            moneyReceiver: moneyReceiver,
+            moneyHolder: moneyHolder,
         },
-        // TODO removed otherWayBalance,
+        user: moneyHolder.id !== jwtPayLoad.h || moneyReceiver.id !== jwtPayLoad.r ? moneyReceiver : moneyHolder,
         amount: jwtPayLoad.o,
-        paymentMethod: moneyReceiver.mollieApiKey ? "mollie" : "iban",
+        paymentMethod: paymentMethod,
     });
 }

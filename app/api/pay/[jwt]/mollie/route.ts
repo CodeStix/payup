@@ -78,17 +78,18 @@ export async function POST(request: NextRequest, { params }: { params: { jwt: st
         return NextResponse.json({ message: "Could not create mollie payment" }, { status: 500 });
     } finally {
         console.log("Mollie payment created", molliePayment?.id);
-        await prisma.relativeUserBalance.update({
-            where: {
-                firstUserId_secondUserId: {
-                    firstUserId,
-                    secondUserId,
+        if (firstUserId !== secondUserId)
+            await prisma.relativeUserBalance.update({
+                where: {
+                    firstUserId_secondUserId: {
+                        firstUserId,
+                        secondUserId,
+                    },
                 },
-            },
-            data: {
-                currentMolliePaymentId: molliePayment?.id || null,
-            },
-        });
+                data: {
+                    currentMolliePaymentId: molliePayment?.id || null,
+                },
+            });
     }
 
     return NextResponse.json({ checkoutUrl: molliePayment.getCheckoutUrl() });

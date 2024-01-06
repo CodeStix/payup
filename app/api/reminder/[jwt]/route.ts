@@ -81,19 +81,20 @@ export async function POST(request: NextRequest, { params }: { params: { jwt: st
             reminder.moneyReceiverId,
             reminder.paidAmount
         );
-        await prisma.relativeUserBalance.update({
-            where: {
-                firstUserId_secondUserId: {
-                    firstUserId,
-                    secondUserId,
+        if (firstUserId !== secondUserId)
+            await prisma.relativeUserBalance.update({
+                where: {
+                    firstUserId_secondUserId: {
+                        firstUserId,
+                        secondUserId,
+                    },
                 },
-            },
-            data: {
-                amount: {
-                    increment: amount,
+                data: {
+                    amount: {
+                        increment: amount,
+                    },
                 },
-            },
-        });
+            });
     }
 
     await prisma.paymentCheckReminder.update({

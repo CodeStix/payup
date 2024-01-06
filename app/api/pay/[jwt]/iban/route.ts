@@ -17,7 +17,6 @@ export async function POST(request: NextRequest, { params }: { params: { jwt: st
     }
 
     const { firstUserId, secondUserId } = moneyHolderReceiverToUsers(jwtPayLoad.h, jwtPayLoad.r, jwtPayLoad.o);
-
     const balance = await prisma.relativeUserBalance.findUnique({
         where: {
             firstUserId_secondUserId: {
@@ -41,20 +40,21 @@ export async function POST(request: NextRequest, { params }: { params: { jwt: st
     }
 
     const { amount: incAmount } = moneyHolderReceiverToUsers(moneyHolderId, moneyReceiverId, amount);
-    await prisma.relativeUserBalance.update({
-        where: {
-            firstUserId_secondUserId: {
-                firstUserId,
-                secondUserId,
+    if (firstUserId !== secondUserId)
+        await prisma.relativeUserBalance.update({
+            where: {
+                firstUserId_secondUserId: {
+                    firstUserId,
+                    secondUserId,
+                },
             },
-        },
-        data: {
-            lastPaymentDate: new Date(),
-            amount: {
-                increment: incAmount,
+            data: {
+                lastPaymentDate: new Date(),
+                amount: {
+                    increment: incAmount,
+                },
             },
-        },
-    });
+        });
 
     // Remind money receiver later about this event
     await prisma.paymentCheckReminder.create({

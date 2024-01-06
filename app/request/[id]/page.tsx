@@ -931,9 +931,15 @@ function PaymentStatusButton(props: {
     onManualPayment: () => void;
     onSetPayingUser: () => void;
 }) {
-    const { status, data: sessionData } = useSession();
+    const { data: sessionData } = useSession();
     const { amount, lastPaymentDate, moneyHolderId, moneyReceiverId } = balanceToMoneyHolderReceiver(
-        props.userToPay.user.firstUserBalances?.[0] ?? props.userToPay.user.secondUserBalances![0]
+        props.userToPay.user.firstUserBalances?.[0] ??
+            props.userToPay.user.secondUserBalances?.[0] ?? {
+                amount: 0,
+                firstUserId: props.userToPay.userId,
+                secondUserId: props.userToPay.userId,
+                lastPaymentDate: null,
+            }
     );
     const moneyHolder = props.userToPay.userId === moneyHolderId ? props.userToPay.user : props.request.paidBy;
     const moneyReceiver = props.userToPay.userId === moneyReceiverId ? props.userToPay.user : props.request.paidBy;
@@ -945,12 +951,12 @@ function PaymentStatusButton(props: {
         <Popover>
             <PopoverTrigger>
                 <IconButton
-                    colorScheme={Math.abs(amount) < 0.01 ? "green" : amount > 0 ? "blue" : "blue"}
+                    colorScheme={even ? "green" : moneyHolder.email === sessionData?.user?.email ? "red" : "blue"}
                     size="xs"
                     rounded={"full"}
                     variant="solid"
                     aria-label="Payment status"
-                    icon={<FontAwesomeIcon icon={Math.abs(amount) < 0.01 ? faCheck : amount >= 0.01 ? faHourglass : faWarning} />}
+                    icon={<FontAwesomeIcon icon={even ? faCheck : moneyHolder.email === sessionData?.user?.email ? faWarning : faHourglass} />}
                 />
             </PopoverTrigger>
             <PopoverContent>

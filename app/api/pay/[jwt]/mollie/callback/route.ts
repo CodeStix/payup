@@ -63,34 +63,19 @@ export async function GET(request: NextRequest, { params }: { params: { jwt: str
     if (molliePayment.status === PaymentStatus.paid) {
         const molliePaid = parseInt(molliePayment.amount.value);
         const { amount: decAmount } = moneyHolderReceiverToUsers(moneyHolder, moneyReceiver, molliePaid);
-        await prisma.relativeUserBalance.update({
-            where: {
-                firstUserId_secondUserId: { firstUserId, secondUserId },
-            },
-            data: {
-                amount: {
-                    decrement: decAmount,
+        if (firstUserId !== secondUserId)
+            await prisma.relativeUserBalance.update({
+                where: {
+                    firstUserId_secondUserId: { firstUserId, secondUserId },
                 },
-                lastPaymentDate: new Date(),
-                currentMolliePaymentId: null,
-            },
-        });
-
-        // try {
-        //     await prisma.relativeUserBalance.update({
-        //         where: {
-        //             moneyHolderId_moneyReceiverId: {
-        //                 moneyHolderId: jwtPayLoad.r,
-        //                 moneyReceiverId: jwtPayLoad.h,
-        //             },
-        //         },
-        //         data: {
-        //             amount: {
-        //                 set: 0,
-        //             },
-        //         },
-        //     });
-        // } catch {}
+                data: {
+                    amount: {
+                        decrement: decAmount,
+                    },
+                    lastPaymentDate: new Date(),
+                    currentMolliePaymentId: null,
+                },
+            });
     }
 
     return NextResponse.redirect(`${process.env.SERVER_URL}/pay/${params.jwt}?status=${encodeURIComponent(molliePayment.status)}`);

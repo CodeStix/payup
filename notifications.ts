@@ -208,6 +208,10 @@ export async function notifyUsers(all: boolean) {
 
     for (const balance of balances) {
         const { moneyHolder, moneyReceiver, amount } = balanceToMoneyHolderReceiver(balance);
+        if (moneyHolder.id === moneyReceiver.id) {
+            console.warn("Row with self reference found", moneyHolder.id);
+            continue;
+        }
 
         if (amount < 0.01) {
             console.warn("Skipping", moneyHolder, "to", moneyReceiver, "because amount", amount);
