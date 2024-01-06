@@ -1,4 +1,5 @@
 import { authOptions } from "@/authOptions";
+import { moneyHolderReceiverToUsers } from "@/balance";
 import { PrismaClient } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
     const balances = await prisma.relativeUserBalance.findMany({
         where: {
-            OR: [{ moneyHolder: { email: session.user.email } }, { moneyReceiver: { email: session.user.email } }],
+            OR: [{ firstUser: { email: session.user.email } }, { secondUser: { email: session.user.email } }],
         },
         select: {
             amount: true,
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
                     name: true,
                 },
             },
-            moneyReceiver: {
+            firstUser: {
                 select: {
                     id: true,
                     userName: true,
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
                     avatarUrl: true,
                 },
             },
-            moneyHolder: {
+            secondUser: {
                 select: {
                     id: true,
                     userName: true,
@@ -41,19 +42,6 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
             },
         },
     });
-
-    const pairs = new Map<string, (typeof balances)[number]>();
-    for (const balance of balances) {
-        pairs.set(`${balance.moneyHolder.id}->${balance.moneyReceiver.id}`, balance);
-    }
-
-    for (const balance of balances) {
-
-        if(balance.moneyHolder.id) {
-            
-        }
-
-    }
 
     return NextResponse.json(balances);
 }
@@ -74,20 +62,26 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     }
 
     try {
+        const { firstUserId, secondUserId, amount, moneyHolderKey } = moneyHolderReceiverToUsers(
+            body.moneyHolderId,
+            body.moneyReceiverId,
+            body.amount
+        );
+
         await prisma.relativeUserBalance.update({
             where: {
-                moneyHolderId_moneyReceiverId: {
-                    moneyHolderId: body.amount > 0 ? body.moneyHolderId : body.moneyReceiverId,
-                    moneyReceiverId: body.amount > 0 ? body.moneyReceiverId : body.moneyHolderId,
+                firstUserId_secondUserId: {
+                    firstUserId: firstUserId,
+                    secondUserId: secondUserId,
                 },
-                moneyHolder: {
+                [moneyHolderKey]: {
                     OR: [{ allowOtherUserManualTranser: true }, { email: session.user.email }],
                 },
             },
             data: {
                 lastPaymentDate: new Date(),
                 amount: {
-                    increment: Math.abs(body.amount),
+                    increment: amount,
                 },
             },
         });

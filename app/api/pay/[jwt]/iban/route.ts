@@ -1,6 +1,7 @@
-import { JwtPayload } from "jsonwebtoken";
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
+import { balanceToMoneyHolderReceiver, moneyHolderReceiverToUsers } from "@/balance";
+import { JwtPayload } from "@/notifications";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -15,11 +16,13 @@ export async function POST(request: NextRequest, { params }: { params: { jwt: st
         return NextResponse.json({}, { status: 400 });
     }
 
+    const { firstUserId, secondUserId } = moneyHolderReceiverToUsers(jwtPayLoad.h, jwtPayLoad.r, jwtPayLoad.o);
+
     const balance = await prisma.relativeUserBalance.findUnique({
         where: {
-            moneyHolderId_moneyReceiverId: {
-                moneyHolderId: jwtPayLoad.h,
-                moneyReceiverId: jwtPayLoad.r,
+            firstUserId_secondUserId: {
+                firstUserId,
+                secondUserId,
             },
         },
     });
@@ -28,33 +31,27 @@ export async function POST(request: NextRequest, { params }: { params: { jwt: st
         return NextResponse.json({ message: "Not found" }, { status: 404 });
     }
 
-    const otherWayBalance = await prisma.relativeUserBalance.findUnique({
-        where: {
-            moneyHolderId_moneyReceiverId: {
-                moneyHolderId: jwtPayLoad.r,
-                moneyReceiverId: jwtPayLoad.h,
-            },
-        },
-    });
+    const { amount, moneyHolderId, moneyReceiverId } = balanceToMoneyHolderReceiver(balance);
 
-    const ows = otherWayBalance ? balance.amount - otherWayBalance.amount : balance.amount;
-
-    if (ows <= 0) {
-        return NextResponse.json({ message: ows === 0 ? "Already paid" : "The other user ows you money" }, { status: 400 });
+    if (amount < 0.01) {
+        return NextResponse.json({ message: "Already even" }, { status: 400 });
+    }
+    if (moneyHolderId !== jwtPayLoad.h || moneyReceiverId !== jwtPayLoad.r) {
+        return NextResponse.json({ message: "Other way around" }, { status: 400 });
     }
 
+    const { amount: incAmount } = moneyHolderReceiverToUsers(moneyHolderId, moneyReceiverId, amount);
     await prisma.relativeUserBalance.update({
         where: {
-            moneyHolderId_moneyReceiverId: {
-                // Flipped
-                moneyHolderId: jwtPayLoad.r,
-                moneyReceiverId: jwtPayLoad.h,
+            firstUserId_secondUserId: {
+                firstUserId,
+                secondUserId,
             },
         },
         data: {
             lastPaymentDate: new Date(),
             amount: {
-                increment: ows,
+                increment: -incAmount,
             },
         },
     });
@@ -63,28 +60,12 @@ export async function POST(request: NextRequest, { params }: { params: { jwt: st
     await prisma.paymentCheckReminder.create({
         data: {
             paidDate: new Date(),
-            paidAmount: ows,
+            paidAmount: amount,
             opened: false,
             moneyHolderId: jwtPayLoad.h,
             moneyReceiverId: jwtPayLoad.r,
         },
     });
-
-    // if (otherWayBalance) {
-    //     await prisma.relativeUserBalance.update({
-    //         where: {
-    //             moneyHolderId_moneyReceiverId: {
-    //                 moneyHolderId: jwtPayLoad.r,
-    //                 moneyReceiverId: jwtPayLoad.h,
-    //             },
-    //         },
-    //         data: {
-    //             amount: {
-    //                 set: 0,
-    //             },
-    //         },
-    //     });
-    // }
 
     return NextResponse.json({ message: "Done" });
 }

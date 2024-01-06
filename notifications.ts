@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import fs from "fs/promises";
 import { htmlToText } from "html-to-text";
 import { getUserDisplayName } from "./util";
+import { balanceToMoneyHolderReceiver } from "./balance";
 
 const prisma = new PrismaClient();
 
@@ -158,23 +159,37 @@ export async function notifyUsers(all: boolean) {
     const emailTemplateString = await fs.readFile(EMAIL_TEMPLATE_PATH, { encoding: "utf-8" });
 
     const now = new Date();
-    const notifyBeforeMs = now.getTime() - NOTIFY_INTERVAL_MS;
-    const lastUpdatedBeforeMs = now.getTime() - NOTIFY_NOT_UPDATE_BEFORE_MS;
+    const notifyBefore = new Date(now.getTime() - NOTIFY_INTERVAL_MS);
+    const lastUpdatedBefore = new Date(now.getTime() - NOTIFY_NOT_UPDATE_BEFORE_MS);
 
     const balances = await prisma.relativeUserBalance.findMany({
-        where: {},
+        where: {
+            amount: {
+                not: 0,
+            },
+            lastUpdatedDate: all
+                ? {}
+                : {
+                      lt: lastUpdatedBefore,
+                  },
+            lastNotificationDate: all
+                ? {}
+                : {
+                      lt: notifyBefore,
+                  },
+        },
         select: {
             lastUpdatedDate: true,
             lastNotificationDate: true,
             amount: true,
-            moneyHolder: {
+            firstUser: {
                 select: {
                     id: true,
                     email: true,
                     userName: true,
                 },
             },
-            moneyReceiver: {
+            secondUser: {
                 select: {
                     id: true,
                     email: true,
@@ -191,77 +206,58 @@ export async function notifyUsers(all: boolean) {
 
     console.log("Found", balances.length, "balances to notify about", all ? "(all)" : "(timed)");
 
-    const pairs = new Map<string, (typeof balances)[number]>();
     for (const balance of balances) {
-        pairs.set(`${balance.moneyHolder.id}->${balance.moneyReceiver.id}`, balance);
-    }
+        const { moneyHolder, moneyReceiver, amount } = balanceToMoneyHolderReceiver(balance);
 
-    const notifiedBalances: typeof balances = [];
-    for (const balance of balances) {
-        if (!all) {
-            if (
-                (balance.lastNotificationDate && balance.lastNotificationDate.getTime() >= notifyBeforeMs) ||
-                balance.lastUpdatedDate.getTime() >= lastUpdatedBeforeMs
-            ) {
-                // Already notified recently or was recently updated
-                continue;
-            }
-        }
-
-        const otherWayBalance = pairs.get(`${balance.moneyReceiver.id}->${balance.moneyHolder.id}`);
-
-        if (balance.amount < 0) {
-            console.warn("A balance is negative", balance);
-        }
-
-        const owsAmount = otherWayBalance ? balance.amount - otherWayBalance.amount : balance.amount;
-        if (owsAmount < 0.01) {
-            // Ows the other way around or doesn't owe anything, skip
+        if (amount < 0.01) {
+            console.warn("Skipping", moneyHolder, "to", moneyReceiver, "because amount", amount);
             continue;
         }
 
-        const paymentLink = await generatePaymentLink(balance.moneyHolder.id, balance.moneyReceiver.id, owsAmount);
+        const paymentLink = await generatePaymentLink(moneyHolder.id, moneyReceiver.id, amount);
 
         console.log(
             "Notify",
-            balance.moneyHolder.email,
+            moneyHolder.email,
             "should send money to",
-            balance.moneyReceiver.email,
+            moneyReceiver.email,
             "=",
-            owsAmount,
+            amount,
             process.env.NODE_ENV === "development" ? paymentLink : ""
         );
 
         try {
             await sendMail(
-                balance.moneyHolder.email,
-                `You still owe ${getUserDisplayName(balance.moneyReceiver)} money, pay up!`,
+                moneyHolder.email,
+                `You still owe ${getUserDisplayName(moneyReceiver)} money, pay up!`,
                 getEmailHtml(emailTemplateString, {
                     paymentLink,
-                    userName: getUserDisplayName(balance.moneyHolder),
-                    paidByUserName: getUserDisplayName(balance.moneyReceiver),
-                    paidByEmail: balance.moneyReceiver.email,
-                    description:
-                        (balance.lastRelatingPaymentRequest?.name ?? "an unknown reason") +
-                        (otherWayBalance && otherWayBalance.lastRelatingPaymentRequest?.name !== balance.lastRelatingPaymentRequest?.name
-                            ? ` and ${getUserDisplayName(balance.moneyReceiver)} still ows you for ${
-                                  otherWayBalance.lastRelatingPaymentRequest?.name ?? "an unknown reason"
-                              }`
-                            : ""),
+                    userName: getUserDisplayName(moneyHolder),
+                    paidByUserName: getUserDisplayName(moneyReceiver),
+                    paidByEmail: moneyReceiver.email,
+                    description: balance.lastRelatingPaymentRequest?.name ?? "an unknown reason",
                 })
             );
         } catch (ex) {
-            console.error("Could not send mail to", balance.moneyHolder.email, ex);
+            console.error("Could not send mail to", moneyHolder.email, ex);
         }
-
-        notifiedBalances.push(balance);
     }
-
-    console.log("Notified about", notifiedBalances.length, "balances");
 
     await prisma.relativeUserBalance.updateMany({
         where: {
-            OR: notifiedBalances.map((e) => ({ moneyReceiverId: e.moneyReceiver.id, moneyHolderId: e.moneyHolder.id })),
+            amount: {
+                not: 0,
+            },
+            lastUpdatedDate: all
+                ? {}
+                : {
+                      lt: lastUpdatedBefore,
+                  },
+            lastNotificationDate: all
+                ? {}
+                : {
+                      lt: notifyBefore,
+                  },
         },
         data: {
             lastNotificationDate: now,

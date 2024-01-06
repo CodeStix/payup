@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { PrismaClient, User } from "@prisma/client";
 import { JwtPayload, generatePaymentLink } from "@/notifications";
+import { balanceToMoneyHolderReceiver, moneyHolderReceiverToUsers } from "@/balance";
 
 const prisma = new PrismaClient();
 
@@ -15,23 +16,23 @@ export async function GET(request: NextRequest, { params }: { params: { jwt: str
         return NextResponse.json({}, { status: 400 });
     }
 
+    const { firstUserId, secondUserId } = moneyHolderReceiverToUsers(jwtPayLoad.h, jwtPayLoad.r, jwtPayLoad.o);
     const balance = await prisma.relativeUserBalance.findUnique({
         where: {
-            moneyHolderId_moneyReceiverId: {
-                moneyHolderId: jwtPayLoad.h,
-                moneyReceiverId: jwtPayLoad.r,
-            },
+            firstUserId_secondUserId: { firstUserId, secondUserId },
         },
         select: {
-            moneyHolder: {
+            firstUser: {
                 select: {
                     id: true,
                     email: true,
                     avatarUrl: true,
                     userName: true,
+                    iban: true,
+                    mollieApiKey: true,
                 },
             },
-            moneyReceiver: {
+            secondUser: {
                 select: {
                     id: true,
                     email: true,
@@ -54,33 +55,23 @@ export async function GET(request: NextRequest, { params }: { params: { jwt: str
         return NextResponse.json(null, { status: 404 });
     }
 
-    const otherWayBalance = await prisma.relativeUserBalance.findUnique({
-        where: {
-            moneyHolderId_moneyReceiverId: {
-                moneyHolderId: jwtPayLoad.r,
-                moneyReceiverId: jwtPayLoad.h,
-            },
-        },
-        select: {
-            amount: true,
-            lastRelatingPaymentRequest: {
-                select: {
-                    name: true,
-                },
-            },
-        },
-    });
+    const { amount, moneyHolder, moneyReceiver } = balanceToMoneyHolderReceiver(balance);
 
     return NextResponse.json({
         balance: {
             ...balance,
+            amount: amount,
             moneyReceiver: {
-                ...balance.moneyReceiver,
+                ...moneyReceiver,
+                mollieApiKey: undefined,
+            },
+            moneyHolder: {
+                ...moneyHolder,
                 mollieApiKey: undefined,
             },
         },
-        otherWayBalance,
+        // TODO removed otherWayBalance,
         amount: jwtPayLoad.o,
-        paymentMethod: balance.moneyReceiver.mollieApiKey ? "mollie" : "iban",
+        paymentMethod: moneyReceiver.mollieApiKey ? "mollie" : "iban",
     });
 }

@@ -4,6 +4,7 @@ import { PrismaClient } from "@prisma/client";
 import { getClientForUser } from "@/mollie";
 import { JwtPayload } from "@/notifications";
 import { PaymentStatus } from "@mollie/api-client";
+import { balanceToMoneyHolderReceiver, moneyHolderReceiverToUsers } from "@/balance";
 
 const prisma = new PrismaClient();
 
@@ -17,15 +18,14 @@ export async function GET(request: NextRequest, { params }: { params: { jwt: str
         return NextResponse.json({}, { status: 400 });
     }
 
+    const { firstUserId, secondUserId } = moneyHolderReceiverToUsers(jwtPayLoad.h, jwtPayLoad.r, jwtPayLoad.o);
     const balance = await prisma.relativeUserBalance.findUnique({
         where: {
-            moneyHolderId_moneyReceiverId: {
-                moneyHolderId: jwtPayLoad.h,
-                moneyReceiverId: jwtPayLoad.r,
-            },
+            firstUserId_secondUserId: { firstUserId, secondUserId },
         },
         include: {
-            moneyReceiver: true,
+            firstUser: true,
+            secondUser: true,
             lastRelatingPaymentRequest: {
                 select: {
                     name: true,
@@ -37,14 +37,18 @@ export async function GET(request: NextRequest, { params }: { params: { jwt: str
     if (!balance) {
         return NextResponse.json({ message: "Not found" }, { status: 404 });
     }
-
     if (!balance.currentMolliePaymentId) {
         return NextResponse.json({ message: "No payment active" }, { status: 400 });
     }
 
-    const mollieClient = getClientForUser(balance.moneyReceiver);
+    const { moneyReceiver, moneyHolder } = balanceToMoneyHolderReceiver(balance);
+    if (moneyReceiver.id !== jwtPayLoad.r || moneyHolder.id !== jwtPayLoad.h) {
+        return NextResponse.json({ message: "Other way around" }, { status: 400 });
+    }
+
+    const mollieClient = getClientForUser(moneyReceiver);
     if (!mollieClient) {
-        console.error("Could not get mollie client for", balance.moneyReceiver);
+        console.error("Could not get mollie client for", moneyReceiver);
         return NextResponse.json({ message: "Cannot create mollie client" }, { status: 400 });
     }
 
@@ -57,17 +61,15 @@ export async function GET(request: NextRequest, { params }: { params: { jwt: str
     }
 
     if (molliePayment.status === PaymentStatus.paid) {
+        const molliePaid = parseInt(molliePayment.amount.value);
+        const { amount: decAmount } = moneyHolderReceiverToUsers(moneyHolder, moneyReceiver, molliePaid);
         await prisma.relativeUserBalance.update({
             where: {
-                moneyHolderId_moneyReceiverId: {
-                    // Flipped
-                    moneyHolderId: jwtPayLoad.r,
-                    moneyReceiverId: jwtPayLoad.h,
-                },
+                firstUserId_secondUserId: { firstUserId, secondUserId },
             },
             data: {
                 amount: {
-                    increment: parseInt(molliePayment.amount.value),
+                    decrement: decAmount,
                 },
                 lastPaymentDate: new Date(),
                 currentMolliePaymentId: null,

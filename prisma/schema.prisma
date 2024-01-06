@@ -30,8 +30,8 @@ model User {
   // This user is related to because they initiated a connected to this user
   responders UserToUser[] @relation("responders")
 
-  holdsMoneyFrom                      RelativeUserBalance[]  @relation("relativeBalanceMoneyHolder")
-  shouldReceiveMoneyFrom              RelativeUserBalance[]  @relation("relativeBalanceMoneyReceiver")
+  firstUserBalances                   RelativeUserBalance[]  @relation("relativeBalanceMoneyHolder")
+  secondUserBalances                  RelativeUserBalance[]  @relation("relativeBalanceMoneyReceiver")
   holdsMoneyFromCheckReminder         PaymentCheckReminder[] @relation("paymentCheckReminderMoneyHolder")
   shouldReceiveMoneyFromCheckReminder PaymentCheckReminder[] @relation("paymentCheckReminderMoneyReceiver")
 }
@@ -77,11 +77,12 @@ model PaymentRequest {
 }
 
 model RelativeUserBalance {
-  moneyHolder     User @relation(fields: [moneyHolderId], references: [id], name: "relativeBalanceMoneyHolder")
-  moneyHolderId   Int
-  moneyReceiver   User @relation(fields: [moneyReceiverId], references: [id], name: "relativeBalanceMoneyReceiver")
-  moneyReceiverId Int
+  firstUser    User @relation(fields: [firstUserId], references: [id], name: "relativeBalanceMoneyHolder")
+  firstUserId  Int
+  secondUser   User @relation(fields: [secondUserId], references: [id], name: "relativeBalanceMoneyReceiver")
+  secondUserId Int
 
+  // The amount that secondUser should receive from firstUser
   amount                       Float           @default(0)
   lastUpdatedDate              DateTime        @default(now())
   lastPaymentDate              DateTime?
@@ -91,7 +92,7 @@ model RelativeUserBalance {
 
   currentMolliePaymentId String?
 
-  @@id([moneyHolderId, moneyReceiverId])
+  @@id([firstUserId, secondUserId])
 }
 
 model PaymentCheckReminder {

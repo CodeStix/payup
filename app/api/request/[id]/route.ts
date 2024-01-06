@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/authOptions";
 import { calculateUserAmount, getTotalParts } from "@/util";
+import { moneyHolderReceiverToUsers } from "@/balance";
 
 const prisma = new PrismaClient();
 
@@ -47,18 +48,19 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
                             id: true,
                             userName: true,
                             avatarUrl: true,
-                            holdsMoneyFrom: {
+                            firstUserBalances: {
+                                // TODO changed
                                 where: {
-                                    moneyReceiverId: paymentRequest.paidById,
+                                    secondUserId: paymentRequest.paidById,
                                 },
                                 select: {
                                     amount: true,
                                     lastPaymentDate: true,
                                 },
                             },
-                            shouldReceiveMoneyFrom: {
+                            secondUserBalances: {
                                 where: {
-                                    moneyHolderId: paymentRequest.paidById,
+                                    firstUserId: paymentRequest.paidById,
                                 },
                                 select: {
                                     amount: true,
@@ -104,23 +106,20 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
 
         for (const userToPay of deletedRequest.usersToPay) {
             const deletedAmountToPay = calculateUserAmount(totalParts, deletedRequest.amount, userToPay.partsOfAmount!);
-
+            const { amount, firstUserId, secondUserId } = moneyHolderReceiverToUsers(deletedRequest.paidById, userToPay.userId!, deletedAmountToPay);
             await prisma.relativeUserBalance.upsert({
                 where: {
-                    moneyHolderId_moneyReceiverId: {
-                        moneyReceiverId: userToPay.userId!,
-                        moneyHolderId: deletedRequest.paidById,
-                    },
+                    firstUserId_secondUserId: { firstUserId, secondUserId },
                 },
                 update: {
                     amount: {
-                        increment: deletedAmountToPay,
+                        increment: amount,
                     },
                     lastUpdatedDate: new Date(),
                 },
                 create: {
-                    moneyReceiverId: userToPay.userId!,
-                    moneyHolderId: deletedRequest.paidById,
+                    firstUserId,
+                    secondUserId,
                     amount: 0,
                 },
             });
@@ -223,25 +222,23 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                 // if (diff >= 0) console.log("Adjusted", [bodyPaidById, bodyUserToPay.userId!], "increment", Math.abs(diff));
                 // else console.log("Adjusted", [bodyUserToPay.userId!, bodyPaidById], "increment", Math.abs(diff));
 
+                const { firstUserId, secondUserId, amount } = moneyHolderReceiverToUsers(bodyUserToPay.userId!, bodyPaidById, diff);
                 prismaOperations.push(
                     prisma.relativeUserBalance.upsert({
                         where: {
-                            moneyHolderId_moneyReceiverId: {
-                                moneyReceiverId: diff >= 0 ? bodyPaidById : bodyUserToPay.userId!,
-                                moneyHolderId: diff >= 0 ? bodyUserToPay.userId! : bodyPaidById,
-                            },
+                            firstUserId_secondUserId: { firstUserId, secondUserId },
                         },
                         update: {
                             amount: {
-                                increment: Math.abs(diff),
+                                increment: amount,
                             },
                             lastRelatingPaymentRequestId: params.id,
                             lastUpdatedDate: new Date(),
                         },
                         create: {
-                            moneyReceiverId: diff >= 0 ? bodyPaidById : bodyUserToPay.userId!,
-                            moneyHolderId: diff >= 0 ? bodyUserToPay.userId! : bodyPaidById,
-                            amount: diff >= 0 ? bodyAmount : Math.abs(diff),
+                            firstUserId,
+                            secondUserId,
+                            amount: amount,
                             lastRelatingPaymentRequestId: params.id,
                         },
                     })
@@ -251,24 +248,22 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
             // New was added
             // console.log("Added", [bodyPaidById, bodyUserToPay.userId!], "increment", bodyAmount);
 
+            const { firstUserId, secondUserId, amount } = moneyHolderReceiverToUsers(bodyUserToPay.userId!, bodyPaidById, bodyAmount);
             prismaOperations.push(
                 prisma.relativeUserBalance.upsert({
                     where: {
-                        moneyHolderId_moneyReceiverId: {
-                            moneyReceiverId: bodyPaidById,
-                            moneyHolderId: bodyUserToPay.userId!,
-                        },
+                        firstUserId_secondUserId: { firstUserId, secondUserId },
                     },
                     update: {
                         amount: {
-                            increment: bodyAmount,
+                            increment: amount,
                         },
                         lastRelatingPaymentRequestId: params.id,
                         lastUpdatedDate: new Date(),
                     },
                     create: {
-                        moneyReceiverId: bodyPaidById,
-                        moneyHolderId: bodyUserToPay.userId!,
+                        firstUserId,
+                        secondUserId,
                         amount: bodyAmount,
                         lastRelatingPaymentRequestId: params.id,
                     },
@@ -291,29 +286,26 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         const deletedAmountToPay = calculateUserAmount(existingTotalParts, existingRequest.amount, deletedUserToPay.partsOfAmount!);
         // console.log("Deleted", [existingRequest.paidById, deletedUserToPay.userId!], "decrement", deletedAmountToPay);
 
+        const { firstUserId, secondUserId, amount } = moneyHolderReceiverToUsers(
+            deletedUserToPay.userId!,
+            existingRequest.paidById,
+            deletedAmountToPay
+        );
         prismaOperations.push(
             prisma.relativeUserBalance.upsert({
                 where: {
-                    moneyHolderId_moneyReceiverId: {
-                        // moneyReceiverId: existingRequest.paidById,
-                        // moneyHolderId: deletedUserToPay.userId!,
-                        moneyReceiverId: deletedUserToPay.userId!,
-                        moneyHolderId: existingRequest.paidById,
-                    },
+                    firstUserId_secondUserId: { firstUserId, secondUserId },
                 },
                 update: {
                     amount: {
-                        // decrement: deletedAmountToPay,
-                        increment: deletedAmountToPay,
+                        decrement: amount,
                     },
                     lastRelatingPaymentRequestId: params.id,
                     lastUpdatedDate: new Date(),
                 },
                 create: {
-                    // moneyReceiverId: existingRequest.paidById,
-                    // moneyHolderId: deletedUserToPay.userId!,
-                    moneyReceiverId: deletedUserToPay.userId!,
-                    moneyHolderId: existingRequest.paidById,
+                    firstUserId,
+                    secondUserId,
                     amount: 0,
                 },
             })
@@ -389,18 +381,19 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                                 id: true,
                                 userName: true,
                                 avatarUrl: true,
-                                holdsMoneyFrom: {
+                                firstUserBalances: {
+                                    // TODO changed
                                     where: {
-                                        moneyReceiverId: bodyPaidById,
+                                        secondUserId: bodyPaidById,
                                     },
                                     select: {
                                         amount: true,
                                         lastPaymentDate: true,
                                     },
                                 },
-                                shouldReceiveMoneyFrom: {
+                                secondUserBalances: {
                                     where: {
-                                        moneyHolderId: bodyPaidById,
+                                        firstUserId: bodyPaidById,
                                     },
                                     select: {
                                         amount: true,

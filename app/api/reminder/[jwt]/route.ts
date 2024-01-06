@@ -2,6 +2,7 @@ import { JwtPayloadReminder } from "@/notifications";
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { PrismaClient } from "@prisma/client";
+import { moneyHolderReceiverToUsers } from "@/balance";
 
 const prisma = new PrismaClient();
 
@@ -75,16 +76,21 @@ export async function POST(request: NextRequest, { params }: { params: { jwt: st
 
     if (body.paid === false) {
         // Re-create money difference
+        const { firstUserId, secondUserId, amount } = moneyHolderReceiverToUsers(
+            reminder.moneyHolderId,
+            reminder.moneyReceiverId,
+            reminder.paidAmount
+        );
         await prisma.relativeUserBalance.update({
             where: {
-                moneyHolderId_moneyReceiverId: {
-                    moneyHolderId: reminder.moneyHolderId,
-                    moneyReceiverId: reminder.moneyReceiverId,
+                firstUserId_secondUserId: {
+                    firstUserId,
+                    secondUserId,
                 },
             },
             data: {
                 amount: {
-                    increment: reminder.paidAmount,
+                    increment: amount,
                 },
             },
         });

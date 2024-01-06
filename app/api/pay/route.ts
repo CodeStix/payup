@@ -3,6 +3,7 @@ import { PrismaClient, User } from "@prisma/client";
 import { JwtPayload, generatePaymentLink } from "@/notifications";
 import { authOptions } from "@/authOptions";
 import { getServerSession } from "next-auth";
+import { balanceToMoneyHolderReceiver, moneyHolderReceiverToUsers } from "@/balance";
 
 const prisma = new PrismaClient();
 
@@ -17,12 +18,10 @@ export async function POST(request: NextRequest, { params }: { params: { jwt: st
         moneyReceiverId: number;
     };
 
+    const { firstUserId, secondUserId } = moneyHolderReceiverToUsers(body.moneyHolderId, body.moneyReceiverId);
     const balance = await prisma.relativeUserBalance.findUnique({
         where: {
-            moneyHolderId_moneyReceiverId: {
-                moneyHolderId: body.moneyHolderId,
-                moneyReceiverId: body.moneyReceiverId,
-            },
+            firstUserId_secondUserId: { firstUserId, secondUserId },
         },
     });
 
@@ -30,23 +29,15 @@ export async function POST(request: NextRequest, { params }: { params: { jwt: st
         return NextResponse.json({ message: "Not found" }, { status: 404 });
     }
 
-    const otherWayBalance = await prisma.relativeUserBalance.findUnique({
-        where: {
-            moneyHolderId_moneyReceiverId: {
-                moneyHolderId: body.moneyReceiverId,
-                moneyReceiverId: body.moneyHolderId,
-            },
-        },
-    });
-
-    const owsAmount = otherWayBalance ? balance.amount - otherWayBalance.amount : balance.amount;
-
-    if (owsAmount <= 0) {
-        return NextResponse.json({ message: "Doesn't owe" }, { status: 400 });
+    const { moneyHolderId, moneyReceiverId, amount } = balanceToMoneyHolderReceiver(balance);
+    if (amount < 0.01) {
+        return NextResponse.json({ message: "Already even" }, { status: 400 });
+    }
+    if (body.moneyHolderId !== moneyHolderId || body.moneyReceiverId !== moneyReceiverId) {
+        return NextResponse.json({ message: "Other way around" }, { status: 400 });
     }
 
-    const paymentLink = await generatePaymentLink(body.moneyHolderId, body.moneyReceiverId, owsAmount);
-
+    const paymentLink = await generatePaymentLink(moneyHolderId, moneyReceiverId, amount);
     return NextResponse.json({
         paymentLink: paymentLink,
     });
