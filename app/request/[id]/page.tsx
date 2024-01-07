@@ -974,7 +974,7 @@ function PaymentStatusButton(props: {
         <Popover>
             <PopoverTrigger>
                 <IconButton
-                    colorScheme={even ? "green" : moneyHolder.email === sessionData?.user?.email ? "red" : "blue"}
+                    colorScheme={!props.request.published ? "gray" : even ? "green" : moneyHolder.email === sessionData?.user?.email ? "red" : "blue"}
                     size="xs"
                     rounded={"full"}
                     variant="solid"
@@ -987,6 +987,16 @@ function PaymentStatusButton(props: {
                 <PopoverCloseButton />
                 <PopoverHeader>Payment status</PopoverHeader>
                 <PopoverBody display="flex" gap={2} flexDir="column">
+                    {!props.request.published && (
+                        <Alert status="warning" flexDir="column" rounded="lg">
+                            <Flex>
+                                <AlertIcon />
+                                <AlertTitle>Not published yet</AlertTitle>
+                            </Flex>
+                            <AlertDescription>This is calculated without your request in mind because it hasn't been published yet.</AlertDescription>
+                        </Alert>
+                    )}
+
                     {even ? (
                         <Text as="p" color="green.500" fontWeight="semibold">
                             <FontAwesomeIcon icon={faCheckCircle} /> {getUserDisplayName(moneyReceiver, sessionData?.user)} and{" "}
