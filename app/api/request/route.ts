@@ -18,6 +18,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         data: {
             name: body.name || "",
             description: body.description || "",
+            published: false,
             owner: {
                 connect: {
                     email: session.user.email,

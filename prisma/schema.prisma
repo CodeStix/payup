@@ -65,6 +65,7 @@ model PaymentRequest {
   createdDate    DateTime @default(now())
   lastUpdateDate DateTime @default(now())
   amount         Float    @default(0)
+  published      Boolean  @default(true)
 
   paidBy     User                   @relation(fields: [paidById], references: [id], name: "paid", onDelete: Cascade)
   paidById   Int

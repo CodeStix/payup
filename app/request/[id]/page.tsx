@@ -69,10 +69,13 @@ import {
     faArrowDown,
     faArrowRight,
     faArrowUp,
+    faBan,
+    faBullhorn,
     faCheck,
     faCheckCircle,
     faCheckDouble,
     faChevronLeft,
+    faCircleMinus,
     faClipboard,
     faClipboardCheck,
     faCoins,
@@ -84,6 +87,7 @@ import {
     faLink,
     faMoneyBill,
     faMoneyBill1Wave,
+    faMoneyCheck,
     faPlus,
     faSave,
     faSearch,
@@ -562,18 +566,35 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                         </UnorderedList>
                     </Skeleton>
 
-                    <Divider />
+                    <Skeleton isLoaded={!!request}>
+                        <Button
+                            isLoading={isUpdating}
+                            isDisabled={isUpdating || (request?.usersToPay.length ?? 0) < 1}
+                            w="full"
+                            colorScheme={request?.published ? "red" : "green"}
+                            leftIcon={<FontAwesomeIcon icon={request?.published ? faBan : faBullhorn} />}
+                            onClick={() => void patch({ published: !request!.published })}>
+                            {request?.published ? <>Unpublish</> : <>Save & Publish</>}
+                        </Button>
+                    </Skeleton>
 
                     <Skeleton isLoaded={!!request}>
-                        <Button w="full" colorScheme="red" leftIcon={<FontAwesomeIcon icon={faTrash} />} onClick={() => onOpenDelete()}>
+                        <Button
+                            isDisabled={isUpdating}
+                            w="full"
+                            variant="ghost"
+                            colorScheme="red"
+                            leftIcon={<FontAwesomeIcon icon={faTrash} />}
+                            onClick={() => onOpenDelete()}>
                             Delete payment request
                         </Button>
-                        {request?.createdDate && (
-                            <Text opacity={0.5} fontSize="xs" as="p" mt={1}>
-                                Created at {new Date(request.createdDate).toLocaleString()}
-                            </Text>
-                        )}
                     </Skeleton>
+
+                    {request?.createdDate && (
+                        <Text textAlign="center" opacity={0.5} fontSize="xs" as="p" mt={1}>
+                            Created at {new Date(request.createdDate).toLocaleString()}
+                        </Text>
+                    )}
 
                     <AlertDialog isOpen={isOpenDelete} leastDestructiveRef={cancelRef} onClose={onCloseDelete}>
                         <AlertDialogOverlay>

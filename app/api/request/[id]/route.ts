@@ -158,6 +158,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
             userId: number;
             partsOfAmount?: number;
         }[];
+        published?: boolean;
     };
 
     const existingRequest = await prisma.paymentRequest.findUnique({
@@ -170,6 +171,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         select: {
             paidById: true,
             amount: true,
+            published: true,
             usersToPay: {
                 select: {
                     userId: true,
@@ -195,19 +197,21 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     }
 
     // Calculate balance differences between users
+    const existingUsersToPayArray = existingRequest.published ? existingRequest.usersToPay : [];
     const existingUsersToPay = new Map<string, Partial<PaymentRequestToUser>>(
-        existingRequest.usersToPay.map((e) => [getCompositeKey(e.userId, existingRequest.paidById), e])
+        existingUsersToPayArray.map((e) => [getCompositeKey(e.userId, existingRequest.paidById), e])
     );
-    const existingTotalParts = getTotalParts(existingRequest.usersToPay);
+    const existingTotalParts = getTotalParts(existingUsersToPayArray);
 
+    const bodyUsersToPayArray = body.published ?? existingRequest.published ? body.usersToPay ?? existingRequest.usersToPay : [];
     const bodyPaidById = body.paidById ?? existingRequest.paidById;
     const bodyUsersToPay = new Map<string, Partial<PaymentRequestToUser>>(
-        (body.usersToPay ?? existingRequest.usersToPay).map((e) => [
+        bodyUsersToPayArray.map((e) => [
             getCompositeKey(e.userId, bodyPaidById),
             { ...existingUsersToPay.get(getCompositeKey(e.userId, bodyPaidById)), ...e },
         ])
     );
-    const bodyTotalParts = getTotalParts((body.usersToPay ?? existingRequest.usersToPay) as { partsOfAmount: number }[]);
+    const bodyTotalParts = getTotalParts(bodyUsersToPayArray as { partsOfAmount: number }[]);
 
     // console.log("existingUsersToPay", Array.from(existingUsersToPay.values()));
     // console.log("bodyUsersToPay", Array.from(bodyUsersToPay.values()));
@@ -271,7 +275,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                         },
                         update: {
                             amount: {
-                                increment: amount,
+                                decrement: amount,
                             },
                             lastRelatingPaymentRequestId: params.id,
                             lastUpdatedDate: new Date(),
@@ -279,7 +283,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                         create: {
                             firstUserId,
                             secondUserId,
-                            amount: bodyAmount,
+                            amount: -bodyAmount,
                             lastRelatingPaymentRequestId: params.id,
                         },
                     })
@@ -314,7 +318,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                     },
                     update: {
                         amount: {
-                            decrement: amount,
+                            increment: amount,
                         },
                         lastRelatingPaymentRequestId: params.id,
                         lastUpdatedDate: new Date(),
@@ -361,6 +365,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                 paidById: bodyPaidById,
                 amount: body.amount || undefined,
                 lastUpdateDate: new Date(),
+                published: body.published ?? undefined,
                 usersToPay: body.usersToPay
                     ? {
                           upsert: body.usersToPay.map((u) => ({
