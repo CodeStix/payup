@@ -69,9 +69,9 @@ export function getEmailHtml(template: string, fields: Record<string, string>) {
     return template;
 }
 
-const NOTIFY_PAYMENT_REMINDER_INTERVAL_MS = parseInt(process.env.NOTIFY_PAYMENT_REMINDER_INTERVAL_MS || String(1000 * 60 * 60 * 24 * 4));
-const NOTIFY_INTERVAL_MS = parseInt(process.env.NOTIFY_INTERVAL_MS || String(1000 * 60 * 60 * 24 * 2));
-const NOTIFY_NOT_UPDATE_BEFORE_MS = parseInt(process.env.NOTIFY_NOT_UPDATE_BEFORE_MS || String(1000 * 60 * 20));
+const NOTIFY_PAYMENT_REMINDER_INTERVAL_MS = parseInt(process.env.NOTIFY_PAYMENT_REMINDER_INTERVAL_MS || String(1000 * 60 * 60 * 24 * 3));
+const NOTIFY_INTERVAL_MS = parseInt(process.env.NOTIFY_INTERVAL_MS || String(1000 * 60 * 60 * 24 * 3));
+const NOTIFY_NOT_UPDATE_BEFORE_MS = parseInt(process.env.NOTIFY_NOT_UPDATE_BEFORE_MS || String(1000 * 60 * 15));
 
 export async function notifyPaymentReminders(all: boolean) {
     const emailTemplateString = await fs.readFile(REMINDER_EMAIL_TEMPLATE_PATH, { encoding: "utf-8" });
@@ -175,6 +175,7 @@ export async function notifyUsers(all: boolean) {
             amount: {
                 not: 0,
             },
+            paymentPageOpenedDate: all ? undefined : null,
             lastUpdatedDate: all
                 ? {}
                 : {
