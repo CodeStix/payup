@@ -33,6 +33,7 @@ import {
     useDisclosure,
     Switch,
     Tooltip,
+    Badge,
 } from "@chakra-ui/react";
 import type { PaymentRequest, User } from "@prisma/client";
 import { faArrowRight, faCheck, faPlus, faTimes, faUserCog } from "@fortawesome/free-solid-svg-icons";
@@ -233,13 +234,20 @@ export default function HomePage() {
                                     style={{ transition: "100ms" }}
                                     cursor="pointer"
                                     onClick={() => router.push(`/request/${e.id}`)}>
-                                    <CardHeader display="flex" alignItems="center">
-                                        <Box>
-                                            <Heading size="md">{e.name}</Heading>
-                                            <Text>{getUserDisplayName(e.paidBy)} paid</Text>
-                                        </Box>
-                                        <Spacer />
-                                        <Text fontSize="x-large">€{e.amount.toFixed(2)}</Text>
+                                    <CardHeader>
+                                        <Flex alignItems="center">
+                                            <Box>
+                                                <Heading size="md">{e.name}</Heading>
+                                                <Text>{getUserDisplayName(e.paidBy)} paid</Text>
+                                            </Box>
+                                            <Spacer />
+                                            <Text fontSize="x-large">€{e.amount.toFixed(2)}</Text>
+                                        </Flex>
+                                        {!e.published && (
+                                            <Badge variant="solid" colorScheme="red">
+                                                Not published yet
+                                            </Badge>
+                                        )}
                                     </CardHeader>
                                     <CardBody pt={0}>
                                         <Flex alignItems="center" gap={4}>

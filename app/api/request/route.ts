@@ -56,6 +56,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             id: true,
             createdDate: true,
             amount: true,
+            published: true,
             paidBy: {
                 select: {
                     email: true,
@@ -78,9 +79,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
                 },
             },
         },
-        orderBy: {
-            createdDate: "desc",
-        },
+        orderBy: [{ published: "asc" }, { createdDate: "desc" }],
     });
 
     return NextResponse.json({
