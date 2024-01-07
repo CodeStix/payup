@@ -60,6 +60,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
                                     lastPaymentDate: true,
                                     firstUserId: true,
                                     secondUserId: true,
+                                    paymentPageOpenedDate: true,
+                                    lastNotificationDate: true,
                                 },
                             },
                             secondUserBalances: {
@@ -71,6 +73,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
                                     lastPaymentDate: true,
                                     firstUserId: true,
                                     secondUserId: true,
+                                    paymentPageOpenedDate: true,
+                                    lastNotificationDate: true,
                                 },
                             },
                         },
@@ -413,6 +417,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                                     select: {
                                         amount: true,
                                         lastPaymentDate: true,
+                                        paymentPageOpenedDate: true,
+                                        lastNotificationDate: true,
                                         firstUserId: true,
                                         secondUserId: true,
                                     },
@@ -424,6 +430,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                                     select: {
                                         amount: true,
                                         lastPaymentDate: true,
+                                        paymentPageOpenedDate: true,
+                                        lastNotificationDate: true,
                                         firstUserId: true,
                                         secondUserId: true,
                                     },

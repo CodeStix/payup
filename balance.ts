@@ -31,5 +31,7 @@ export function balanceToMoneyHolderReceiver<
         moneyHolderId: (flip ? balance.secondUserId : balance.firstUserId) as number,
         amount: Math.abs(balance.amount),
         lastPaymentDate: balance.lastPaymentDate,
+        paymentPageOpenedDate: balance.paymentPageOpenedDate,
+        lastNotificationDate: balance.lastNotificationDate,
     };
 }

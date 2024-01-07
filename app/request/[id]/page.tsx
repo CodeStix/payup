@@ -81,6 +81,7 @@ import {
     faCoins,
     faCopy,
     faExclamationTriangle,
+    faEye,
     faHandHoldingDollar,
     faHandshake,
     faHourglass,
@@ -317,6 +318,27 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                 router.back();
             } else {
                 throw new Error("Could not delete");
+            }
+        } finally {
+            setUpdating(false);
+        }
+    }
+
+    async function manualPayment(moneyHolderId: number, moneyReceiverId: number, amount: number) {
+        setUpdating(true);
+        try {
+            const res = await fetch("/api/balance", {
+                method: "PATCH",
+                body: JSON.stringify({
+                    amount: amount,
+                    moneyHolderId: moneyHolderId,
+                    moneyReceiverId: moneyReceiverId,
+                }),
+            });
+            if (res.ok) {
+                await mutateRequest();
+            } else {
+                console.error("Could not add manual payment", await res.text());
             }
         } finally {
             setUpdating(false);
@@ -561,6 +583,9 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                                     onSetPayingUser={() => {
                                         void updatePayingUser(e.user.id);
                                     }}
+                                    onConfirmPayment={(holderId, receiverId, amount) => {
+                                        void manualPayment(holderId, receiverId, amount);
+                                    }}
                                 />
                             ))}
                         </UnorderedList>
@@ -658,6 +683,7 @@ function PayingUserListItem(props: {
         partsOfAmount: number;
     };
     totalParts: number;
+    onConfirmPayment: (moneyHolderId: number, moneyReceiverId: number, amount: number) => void;
     onManualPayment: () => void;
     onPaymentLink: (moneyHolderId: number, moneyReceiverId: number, shouldOpen: boolean) => void;
     onChangeFraction: (newFraction: number) => void;
@@ -681,6 +707,7 @@ function PayingUserListItem(props: {
 
             {/* {e.user.email !== sessionData?.user?.email && ( */}
             <PaymentStatusButton
+                onConfirmPayment={props.onConfirmPayment}
                 onManualPayment={props.onManualPayment}
                 onPaymentLink={props.onPaymentLink}
                 onSetPayingUser={props.onSetPayingUser}
@@ -951,37 +978,76 @@ function PaymentStatusButton(props: {
     isDisabled: boolean;
 
     onPaymentLink: (moneyHolderId: number, moneyReceiverId: number, shouldOpen: boolean) => void;
+    onConfirmPayment: (moneyHolderId: number, moneyReceiverId: number, amount: number) => void;
     onManualPayment: () => void;
     onSetPayingUser: () => void;
 }) {
     const { data: sessionData } = useSession();
-    const { amount, lastPaymentDate, moneyHolderId, moneyReceiverId } = balanceToMoneyHolderReceiver(
+    const { amount, lastPaymentDate, moneyHolderId, moneyReceiverId, paymentPageOpenedDate, lastNotificationDate } = balanceToMoneyHolderReceiver(
         props.userToPay.user.firstUserBalances?.[0] ??
             props.userToPay.user.secondUserBalances?.[0] ?? {
                 amount: 0,
                 firstUserId: props.userToPay.userId,
                 secondUserId: props.userToPay.userId,
+                paymentPageOpenedDate: null,
+                lastNotificationDate: null,
                 lastPaymentDate: null,
             }
     );
     const moneyHolder = props.userToPay.userId === moneyHolderId ? props.userToPay.user : props.request.paidBy;
     const moneyReceiver = props.userToPay.userId === moneyReceiverId ? props.userToPay.user : props.request.paidBy;
     const even = amount < 0.01;
+    const openedPaymentPage = !!paymentPageOpenedDate;
 
     console.log({ moneyHolder, moneyReceiver });
 
     return (
         <Popover>
-            <PopoverTrigger>
-                <IconButton
-                    colorScheme={!props.request.published ? "gray" : even ? "green" : moneyHolder.email === sessionData?.user?.email ? "red" : "blue"}
-                    size="xs"
-                    rounded={"full"}
-                    variant="solid"
-                    aria-label="Payment status"
-                    icon={<FontAwesomeIcon icon={even ? faCheck : moneyHolder.email === sessionData?.user?.email ? faWarning : faHourglass} />}
-                />
-            </PopoverTrigger>
+            <Tooltip
+                hasArrow
+                placement="right"
+                label={
+                    even
+                        ? `${getUserDisplayName(moneyReceiver, sessionData?.user)} and ${getUserDisplayName(
+                              moneyHolder,
+                              sessionData?.user
+                          )} are even.`
+                        : openedPaymentPage
+                        ? `${getUserDisplayName(moneyHolder, sessionData?.user)} opened the payment to send €${amount.toFixed(
+                              2
+                          )}. ${getUserDisplayName(moneyReceiver, sessionData?.user)} must confirm the payment.`
+                        : `${getUserDisplayName(moneyHolder, sessionData?.user)} still owes ${getUserDisplayName(
+                              moneyReceiver,
+                              sessionData?.user
+                          )} €${amount.toFixed(2)}.`
+                }>
+                <Box display="inline-block">
+                    <PopoverTrigger>
+                        <IconButton
+                            colorScheme={
+                                !props.request.published ? "gray" : even ? "green" : moneyHolder.email === sessionData?.user?.email ? "red" : "blue"
+                            }
+                            size="xs"
+                            rounded={"full"}
+                            variant="solid"
+                            aria-label="Payment status"
+                            icon={
+                                <FontAwesomeIcon
+                                    icon={
+                                        even
+                                            ? faCheck
+                                            : moneyHolder.email === sessionData?.user?.email
+                                            ? faWarning
+                                            : openedPaymentPage
+                                            ? faEye
+                                            : faHourglass
+                                    }
+                                />
+                            }
+                        />
+                    </PopoverTrigger>
+                </Box>
+            </Tooltip>
             <PopoverContent>
                 <PopoverArrow />
                 <PopoverCloseButton />
@@ -1012,11 +1078,30 @@ function PaymentStatusButton(props: {
                     {!even && (
                         <Text as="p" opacity={0.5}>
                             {getUserDisplayName(moneyHolder, sessionData?.user)} will be notified periodically (weekly) if they haven&apos;t paid. You
-                            can also share a payment link/pay by pressing the green button.
+                            can also share a payment link/pay below.
                         </Text>
                     )}
 
                     <Divider />
+
+                    {/* paymentPageOpenedDate */}
+                    {!even && moneyReceiver.email === sessionData?.user?.email && (
+                        <Tooltip
+                            placement="top"
+                            hasArrow
+                            label={`Press this button if you received €${amount.toFixed(2)} from ${getUserDisplayName(
+                                moneyHolder,
+                                sessionData?.user
+                            )}.`}>
+                            <Button
+                                onClick={() => props.onConfirmPayment(moneyHolderId, moneyReceiverId, amount)}
+                                isDisabled={props.isDisabled}
+                                colorScheme="green"
+                                leftIcon={<FontAwesomeIcon icon={faCheck} />}>
+                                Confirm payment
+                            </Button>
+                        </Tooltip>
+                    )}
 
                     {!even && moneyHolder.email === sessionData?.user?.email ? (
                         <Button
@@ -1031,7 +1116,7 @@ function PaymentStatusButton(props: {
                             variant="solid"
                             isDisabled={props.isDisabled}
                             onClick={() => props.onPaymentLink(moneyHolder.id, moneyReceiver.id, false)}
-                            colorScheme="green"
+                            colorScheme="blue"
                             // size="sm"
                             leftIcon={<FontAwesomeIcon icon={faLink} />}>
                             Show payment link
@@ -1064,8 +1149,8 @@ function PaymentStatusButton(props: {
                         </Button>
                     )}
                 </PopoverBody>
-                {lastPaymentDate && (
-                    <PopoverFooter>
+                <PopoverFooter>
+                    {lastPaymentDate && (
                         <Text as="p" opacity={0.5} fontSize="xs">
                             <>
                                 Last payment at{" "}
@@ -1074,8 +1159,20 @@ function PaymentStatusButton(props: {
                                 </Text>
                             </>
                         </Text>
-                    </PopoverFooter>
-                )}
+                    )}
+                    {!even && (
+                        <Text as="p" opacity={0.5} fontSize="xs">
+                            {openedPaymentPage ? (
+                                <>
+                                    <FontAwesomeIcon icon={faEye} /> The payment link was opened at {new Date(paymentPageOpenedDate).toLocaleString()}
+                                    .
+                                </>
+                            ) : (
+                                <>The payment link hasn't been opened yet</>
+                            )}
+                        </Text>
+                    )}
+                </PopoverFooter>
             </PopoverContent>
         </Popover>
     );
