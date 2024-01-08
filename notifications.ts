@@ -170,23 +170,30 @@ export async function notifyUsers(all: boolean) {
     const notifyBefore = new Date(now.getTime() - NOTIFY_INTERVAL_MS);
     const lastUpdatedBefore = new Date(now.getTime() - NOTIFY_NOT_UPDATE_BEFORE_MS);
 
+    const condition = all
+        ? { amount: { not: 0 } }
+        : {
+              amount: {
+                  not: 0,
+              },
+              paymentPageOpenedDate: null,
+              lastUpdatedDate: {
+                  lt: lastUpdatedBefore,
+              },
+              OR: [
+                  {
+                      lastNotificationDate: {
+                          lt: notifyBefore,
+                      },
+                  },
+                  {
+                      lastNotificationDate: null,
+                  },
+              ],
+          };
+
     const balances = await prisma.relativeUserBalance.findMany({
-        where: {
-            amount: {
-                not: 0,
-            },
-            paymentPageOpenedDate: all ? undefined : null,
-            lastUpdatedDate: all
-                ? {}
-                : {
-                      lt: lastUpdatedBefore,
-                  },
-            lastNotificationDate: all
-                ? {}
-                : {
-                      lt: notifyBefore,
-                  },
-        },
+        where: condition,
         select: {
             lastUpdatedDate: true,
             lastNotificationDate: true,
@@ -257,21 +264,7 @@ export async function notifyUsers(all: boolean) {
     }
 
     await prisma.relativeUserBalance.updateMany({
-        where: {
-            amount: {
-                not: 0,
-            },
-            lastUpdatedDate: all
-                ? {}
-                : {
-                      lt: lastUpdatedBefore,
-                  },
-            lastNotificationDate: all
-                ? {}
-                : {
-                      lt: notifyBefore,
-                  },
-        },
+        where: condition,
         data: {
             lastNotificationDate: now,
         },
