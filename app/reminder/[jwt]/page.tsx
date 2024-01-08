@@ -4,28 +4,26 @@ import { fetcher, getUserDisplayName, removeEmailDomain } from "@/util";
 import { Button, Text, Center, Heading, Skeleton, AlertTitle, Alert, AlertIcon, Flex, Link, Avatar } from "@chakra-ui/react";
 import { faArrowRight, faCheckCircle, faClipboard, faClipboardCheck, faTimesCircle } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { PaymentCheckReminder, RelativeUserBalance, User } from "@prisma/client";
-import { signIn, signOut, useSession } from "next-auth/react";
+import { RelativeUserBalance, User } from "@prisma/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { AppText } from "@/components/AppHeader";
 
 export default function Home({ params }: { params: { jwt: string } }) {
-    const { data: reminder, isLoading: isLoadingReminder } = useSWR<PaymentCheckReminder & { moneyHolder: User; moneyReceiver: User }>(
-        `/api/reminder/${params.jwt}`,
-        fetcher,
-        {
-            revalidateOnReconnect: false,
-            revalidateOnFocus: false,
-            revalidateIfStale: false,
-        }
-    );
-
-    const [loading, setLoading] = useState(false);
-    const router = useRouter();
+    const { data: reminder, isLoading: isLoadingReminder } = useSWR<
+        RelativeUserBalance & { moneyHolder: User; moneyReceiver: User; invalid: boolean }
+    >(`/api/reminder/${params.jwt}`, fetcher, {
+        revalidateOnReconnect: false,
+        revalidateOnFocus: false,
+        revalidateIfStale: false,
+    });
 
     const searchParams = useSearchParams();
+    const router = useRouter();
+    const [loading, setLoading] = useState(false);
+
+    const even = typeof reminder?.amount === "number" && Math.abs(reminder.amount) < 0.01;
     const mailClickedPaid = searchParams.get("confirm") === "yes";
 
     async function updateLink(paid: boolean) {
@@ -46,7 +44,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
     }
 
     useEffect(() => {
-        if (reminder && reminder.confirmed === null) {
+        if (reminder && !reminder.invalid) {
             void updateLink(mailClickedPaid);
         }
     }, [reminder, mailClickedPaid]);
@@ -56,7 +54,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
             <AppText />
 
             <Skeleton isLoaded={!isLoadingReminder && !loading}>
-                {typeof reminder?.confirmed === "boolean" ? (
+                {reminder?.invalid ? (
                     <Heading color="red.500" textAlign="center">
                         Invalid link
                     </Heading>
@@ -72,10 +70,10 @@ export default function Home({ params }: { params: { jwt: string } }) {
             </Skeleton>
 
             <Skeleton isLoaded={!isLoadingReminder && !loading} textAlign="center">
-                {typeof reminder?.confirmed === "boolean" ? (
+                {reminder?.invalid ? (
                     <Text>
                         You already marked this transaction as{" "}
-                        {reminder.confirmed ? (
+                        {even ? (
                             <Text as="span" color="green.500" fontWeight="semibold">
                                 <FontAwesomeIcon icon={faCheckCircle} /> Paid
                             </Text>
@@ -102,7 +100,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
             )} */}
 
             <Skeleton isLoaded={!isLoadingReminder && !loading}>
-                {typeof reminder?.confirmed === "boolean" ? (
+                {reminder?.invalid ? (
                     <Text opacity={0.5} textAlign="center" maxW="lg">
                         If you want to change this transaction, please add a new payment request or manual transaction in{" "}
                         <Button onClick={() => router.replace("/request")} variant="link">

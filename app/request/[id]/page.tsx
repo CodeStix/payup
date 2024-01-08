@@ -1013,7 +1013,7 @@ function PaymentStatusButton(props: {
                               sessionData?.user
                           )} are even.`
                         : openedPaymentPage
-                        ? `${getUserDisplayName(moneyHolder, sessionData?.user)} opened the payment to send €${amount.toFixed(
+                        ? `${getUserDisplayName(moneyHolder, sessionData?.user)} opened the payment link to send €${amount.toFixed(
                               2
                           )}. ${getUserDisplayName(moneyReceiver, sessionData?.user)} must confirm the payment.`
                         : `${getUserDisplayName(moneyHolder, sessionData?.user)} still owes ${getUserDisplayName(

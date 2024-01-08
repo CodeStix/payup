@@ -35,6 +35,10 @@ export type JwtPayload = {
     h: number;
     // Original amount calculated during creation
     o: number;
+    // Creation timestamp, used to invalidate this link if used again
+    c?: number;
+    // If is a reminder
+    m?: true;
 };
 
 export function generateJwt(payload: any) {
@@ -52,9 +56,13 @@ export async function generatePaymentLink(holder: number, receiver: number, amou
     return `${SERVER_URL}/pay/${encodeURIComponent(jwtString)}`;
 }
 
-export async function generatePaymentReminderLink(reminderId: number) {
-    const jwtPayload: JwtPayloadReminder = {
-        m: reminderId,
+export async function generatePaymentReminderLink(holder: number, receiver: number, amount: number) {
+    const jwtPayload: JwtPayload = {
+        r: receiver,
+        h: holder,
+        o: amount,
+        c: new Date().getTime(),
+        m: true,
     };
 
     const jwtString = generateJwt(jwtPayload);
@@ -69,29 +77,36 @@ export function getEmailHtml(template: string, fields: Record<string, string>) {
     return template;
 }
 
-const NOTIFY_PAYMENT_REMINDER_INTERVAL_MS = parseInt(process.env.NOTIFY_PAYMENT_REMINDER_INTERVAL_MS || String(1000 * 60 * 60 * 24 * 3));
+const NOTIFY_PAYMENT_REMINDER_INTERVAL_MS = parseInt(process.env.NOTIFY_PAYMENT_REMINDER_INTERVAL_MS || String(1000 * 60 * 60 * 24 * 5));
+const NOTIFY_PAYMENT_TIMEOUT_MS = parseInt(process.env.NOTIFY_PAYMENT_TIMEOUT_MS || String(1000 * 60 * 60 * 24 * 3));
+
 const NOTIFY_INTERVAL_MS = parseInt(process.env.NOTIFY_INTERVAL_MS || String(1000 * 60 * 60 * 24 * 3));
 const NOTIFY_NOT_UPDATE_BEFORE_MS = parseInt(process.env.NOTIFY_NOT_UPDATE_BEFORE_MS || String(1000 * 60 * 15));
 
 export async function notifyPaymentReminders(all: boolean) {
     const emailTemplateString = await fs.readFile(REMINDER_EMAIL_TEMPLATE_PATH, { encoding: "utf-8" });
 
-    const notifyBefore = new Date(new Date().getTime() - NOTIFY_PAYMENT_REMINDER_INTERVAL_MS);
+    const now = new Date();
+    const paidBefore = new Date(now.getTime() - NOTIFY_PAYMENT_TIMEOUT_MS);
+    const notifyBefore = new Date(now.getTime() - NOTIFY_PAYMENT_REMINDER_INTERVAL_MS);
 
-    const reminders = await prisma.paymentCheckReminder.findMany({
-        where: all
-            ? { confirmed: null }
-            : {
-                  confirmed: null,
-                  lastNotificationDate: {
-                      lt: notifyBefore,
-                  },
-                  paidDate: {
-                      lt: notifyBefore,
-                  },
+    const condition = all
+        ? { amount: { not: 0 }, paymentPageOpenedDate: { not: null } }
+        : {
+              amount: {
+                  not: 0,
               },
+              paymentPageOpenedDate: {
+                  lt: paidBefore,
+              },
+              lastReminderNotificationDate: {
+                  lt: notifyBefore,
+              },
+          };
+    const reminders = await prisma.relativeUserBalance.findMany({
+        where: condition,
         select: {
-            moneyHolder: {
+            firstUser: {
                 select: {
                     id: true,
                     userName: true,
@@ -100,7 +115,7 @@ export async function notifyPaymentReminders(all: boolean) {
                     email: true,
                 },
             },
-            moneyReceiver: {
+            secondUser: {
                 select: {
                     id: true,
                     userName: true,
@@ -109,56 +124,51 @@ export async function notifyPaymentReminders(all: boolean) {
                     email: true,
                 },
             },
-            paidAmount: true,
-            paidDate: true,
-            id: true,
+            amount: true,
+            paymentPageOpenedDate: true,
+            lastRelatingPaymentRequest: {
+                select: {
+                    name: true,
+                },
+            },
         },
     });
 
     console.log("Sending", reminders.length, "payment reminders");
 
     for (const reminder of reminders) {
-        const remindLink = await generatePaymentReminderLink(reminder.id);
+        const { moneyHolder, moneyReceiver, amount } = balanceToMoneyHolderReceiver(reminder);
 
-        console.log(
-            "Remind",
-            reminder.moneyReceiver.email,
-            "about",
-            reminder.moneyHolder.email,
-            "=",
-            reminder.paidAmount,
-            process.env.NODE_ENV === "development" ? remindLink : ""
-        );
+        const remindLink = await generatePaymentReminderLink(moneyHolder.id, moneyReceiver.id, amount);
+
+        console.log("Remind", moneyReceiver.email, "about", moneyHolder.email, "=", amount, process.env.NODE_ENV === "development" ? remindLink : "");
 
         try {
             await sendMail(
-                reminder.moneyReceiver.email,
-                `Did you receive ${reminder.paidAmount.toFixed(2)} from ${getUserDisplayName(reminder.moneyHolder)}? Please confirm`,
+                moneyReceiver.email,
+                `Did you receive ${amount.toFixed(2)} from ${getUserDisplayName(moneyHolder)}? Please confirm`,
                 getEmailHtml(emailTemplateString, {
-                    receiverUserName: getUserDisplayName(reminder.moneyReceiver),
-                    holderUserName: getUserDisplayName(reminder.moneyHolder),
-                    amount: reminder.paidAmount.toFixed(2),
-                    holderUserNameAndIban: reminder.moneyHolder.iban
-                        ? `${getUserDisplayName(reminder.moneyHolder)} (${reminder.moneyHolder.iban})`
-                        : getUserDisplayName(reminder.moneyHolder),
+                    receiverUserName: getUserDisplayName(moneyReceiver),
+                    holderUserName: getUserDisplayName(moneyHolder),
+                    amount: amount.toFixed(2),
+                    description: reminder.lastRelatingPaymentRequest?.name ?? "an unknown reason",
+                    holderUserNameAndIban: moneyHolder.iban
+                        ? `${getUserDisplayName(moneyHolder)} (${moneyHolder.iban})`
+                        : getUserDisplayName(moneyHolder),
                     yesLink: remindLink + "?confirm=yes",
                     noLink: remindLink + "?confirm=no",
-                    paidDate: reminder.paidDate.toLocaleString(),
+                    paidDate: reminder.paymentPageOpenedDate!.toLocaleString(),
                 })
             );
         } catch (ex) {
-            console.error("Could not send mail to", reminder.moneyReceiver.email, ex);
+            console.error("Could not send mail to", moneyReceiver.email, ex);
         }
     }
 
-    await prisma.paymentCheckReminder.updateMany({
-        where: {
-            id: {
-                in: reminders.map((e) => e.id),
-            },
-        },
+    await prisma.relativeUserBalance.updateMany({
+        where: condition,
         data: {
-            lastNotificationDate: new Date(),
+            lastReminderNotificationDate: now,
         },
     });
 }
@@ -191,7 +201,6 @@ export async function notifyUsers(all: boolean) {
                   },
               ],
           };
-
     const balances = await prisma.relativeUserBalance.findMany({
         where: condition,
         select: {

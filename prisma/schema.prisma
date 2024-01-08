@@ -30,10 +30,10 @@ model User {
   // This user is related to because they initiated a connected to this user
   responders UserToUser[] @relation("responders")
 
-  firstUserBalances                   RelativeUserBalance[]  @relation("relativeBalanceMoneyHolder")
-  secondUserBalances                  RelativeUserBalance[]  @relation("relativeBalanceMoneyReceiver")
-  holdsMoneyFromCheckReminder         PaymentCheckReminder[] @relation("paymentCheckReminderMoneyHolder")
-  shouldReceiveMoneyFromCheckReminder PaymentCheckReminder[] @relation("paymentCheckReminderMoneyReceiver")
+  firstUserBalances  RelativeUserBalance[] @relation("relativeBalanceMoneyHolder")
+  secondUserBalances RelativeUserBalance[] @relation("relativeBalanceMoneyReceiver")
+  // holdsMoneyFromCheckReminder         PaymentCheckReminder[] @relation("paymentCheckReminderMoneyHolder")
+  // shouldReceiveMoneyFromCheckReminder PaymentCheckReminder[] @relation("paymentCheckReminderMoneyReceiver")
 }
 
 model UserToUser {
@@ -89,6 +89,8 @@ model RelativeUserBalance {
   paymentPageOpenedDate        DateTime?
   lastPaymentDate              DateTime?
   lastNotificationDate         DateTime?
+  lastReminderNotificationDate DateTime?
+  lastReminderOpenedDate       DateTime?
   lastRelatingPaymentRequest   PaymentRequest? @relation(fields: [lastRelatingPaymentRequestId], references: [id])
   lastRelatingPaymentRequestId String?
 
@@ -97,17 +99,17 @@ model RelativeUserBalance {
   @@id([firstUserId, secondUserId])
 }
 
-model PaymentCheckReminder {
-  id                   Int       @id @default(autoincrement())
-  lastNotificationDate DateTime?
+// model PaymentCheckReminder {
+//   id                   Int       @id @default(autoincrement())
+//   lastNotificationDate DateTime?
 
-  moneyHolder     User @relation(fields: [moneyHolderId], references: [id], name: "paymentCheckReminderMoneyHolder")
-  moneyHolderId   Int
-  moneyReceiver   User @relation(fields: [moneyReceiverId], references: [id], name: "paymentCheckReminderMoneyReceiver")
-  moneyReceiverId Int
+//   moneyHolder     User @relation(fields: [moneyHolderId], references: [id], name: "paymentCheckReminderMoneyHolder")
+//   moneyHolderId   Int
+//   moneyReceiver   User @relation(fields: [moneyReceiverId], references: [id], name: "paymentCheckReminderMoneyReceiver")
+//   moneyReceiverId Int
 
-  // true if paid, false if didn't pay and null if didn't answer
-  confirmed  Boolean?
-  paidDate   DateTime
-  paidAmount Float
-}
+//   // true if paid, false if didn't pay and null if didn't answer
+//   confirmed  Boolean?
+//   paidDate   DateTime
+//   paidAmount Float
+// }

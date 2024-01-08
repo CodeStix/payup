@@ -38,8 +38,7 @@ export async function POST(request: NextRequest, { params }: { params: { jwt: st
     if (moneyHolderId !== jwtPayLoad.h || moneyReceiverId !== jwtPayLoad.r) {
         return NextResponse.json({ message: "Other way around" }, { status: 400 });
     }
-    //
-    // const { amount: incAmount } = moneyHolderReceiverToUsers(moneyHolderId, moneyReceiverId, amount);
+
     if (firstUserId !== secondUserId)
         await prisma.relativeUserBalance.update({
             where: {
@@ -50,35 +49,8 @@ export async function POST(request: NextRequest, { params }: { params: { jwt: st
             },
             data: {
                 paymentPageOpenedDate: new Date(),
-                // amount: {
-                //     increment: incAmount,
-                // },
             },
         });
-
-    const existingReminder = await prisma.paymentCheckReminder.findFirst({
-        where: {
-            moneyHolderId: jwtPayLoad.h,
-            moneyReceiverId: jwtPayLoad.r,
-            paidAmount: amount,
-            confirmed: null,
-        },
-    });
-
-    // Remind money receiver later about this event
-    if (!existingReminder) {
-        await prisma.paymentCheckReminder.create({
-            data: {
-                paidDate: new Date(),
-                paidAmount: amount,
-                confirmed: null,
-                moneyHolderId: jwtPayLoad.h,
-                moneyReceiverId: jwtPayLoad.r,
-            },
-        });
-    } else {
-        console.log("Not creating another reminder for", [jwtPayLoad.h, jwtPayLoad.r], "=", amount);
-    }
 
     return NextResponse.json({ message: "Done" });
 }
