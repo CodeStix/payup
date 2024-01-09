@@ -994,8 +994,9 @@ function PaymentStatusButton(props: {
                 lastPaymentDate: null,
             }
     );
-    const moneyHolder = props.userToPay.userId === moneyHolderId ? props.userToPay.user : props.request.paidBy;
-    const moneyReceiver = props.userToPay.userId === moneyReceiverId ? props.userToPay.user : props.request.paidBy;
+    const [moneyHolder, moneyReceiver] =
+        props.userToPay.userId === moneyHolderId ? [props.userToPay.user, props.request.paidBy] : [props.request.paidBy, props.userToPay.user];
+    // const moneyReceiver = props.userToPay.userId === moneyReceiverId ? props.userToPay.user : props.request.paidBy;
     const even = amount < 0.01;
     const openedPaymentPage = !!paymentPageOpenedDate;
 
@@ -1019,7 +1020,7 @@ function PaymentStatusButton(props: {
                         : `${getUserDisplayName(moneyHolder, sessionData?.user)} still owes ${getUserDisplayName(
                               moneyReceiver,
                               sessionData?.user
-                          )} €${amount.toFixed(2)}.`
+                          )} €${amount.toFixed(2)}. The payment link hasn't been opened yet.`
                 }>
                 <Box display="inline-block">
                     <PopoverTrigger>
@@ -1160,6 +1161,7 @@ function PaymentStatusButton(props: {
                             </>
                         </Text>
                     )}
+
                     {!even && (
                         <Text as="p" opacity={0.5} fontSize="xs">
                             {openedPaymentPage ? (
@@ -1167,8 +1169,15 @@ function PaymentStatusButton(props: {
                                     <FontAwesomeIcon icon={faEye} /> The payment link was opened at {new Date(paymentPageOpenedDate).toLocaleString()}
                                     .
                                 </>
+                            ) : lastNotificationDate ? (
+                                <>
+                                    Last notification was sent at{" "}
+                                    <Text fontWeight="normal" as="span">
+                                        {new Date(lastNotificationDate).toLocaleString()}
+                                    </Text>
+                                </>
                             ) : (
-                                <>The payment link hasn't been opened yet</>
+                                <>Notification hasn't been sent yet. It will be sent before the end of the day.</>
                             )}
                         </Text>
                     )}
