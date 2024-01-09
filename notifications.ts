@@ -77,6 +77,8 @@ export function getEmailHtml(template: string, fields: Record<string, string>) {
     return template;
 }
 
+// NOTIFY_PAYMENT_REMINDER_INTERVAL_MS="14400000" NOTIFY_PAYMENT_TIMEOUT_MS="1200000" NOTIFY_INTERVAL_MS="14400000" NOTIFY_NOT_UPDATE_BEFORE_MS="1200000"
+
 const NOTIFY_PAYMENT_REMINDER_INTERVAL_MS = parseInt(process.env.NOTIFY_PAYMENT_REMINDER_INTERVAL_MS || String(1000 * 60 * 60 * 24 * 5));
 const NOTIFY_PAYMENT_TIMEOUT_MS = parseInt(process.env.NOTIFY_PAYMENT_TIMEOUT_MS || String(1000 * 60 * 60 * 24 * 3));
 
@@ -99,9 +101,14 @@ export async function notifyPaymentReminders(all: boolean) {
               paymentPageOpenedDate: {
                   lt: paidBefore,
               },
-              lastReminderNotificationDate: {
-                  lt: notifyBefore,
-              },
+              OR: [
+                  {
+                      lastReminderNotificationDate: {
+                          lt: notifyBefore,
+                      },
+                  },
+                  { lastReminderNotificationDate: null },
+              ],
           };
     const reminders = await prisma.relativeUserBalance.findMany({
         where: condition,
