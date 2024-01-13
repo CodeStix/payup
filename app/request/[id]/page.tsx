@@ -285,6 +285,8 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
     }
 
     async function updateAmount(amountStr: string) {
+        amountStr = amountStr.replaceAll(",", ".");
+
         let amount;
         try {
             const mexp = new Mexp();
@@ -396,11 +398,11 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                                     </InputLeftElement>
 
                                     <Input
+                                        autoFocus
                                         onBlur={(ev) => {
                                             setAmount(ev.target.value);
                                             void updateAmount(ev.target.value);
                                         }}
-                                        autoFocus
                                         value={amount}
                                         onChange={(ev) => setAmount(ev.target.value)}
                                         max={100000}
@@ -1033,10 +1035,10 @@ function PaymentStatusButton(props: {
                                     icon={
                                         even
                                             ? faCheck
-                                            : moneyHolder.email === sessionData?.user?.email
-                                            ? faWarning
                                             : openedPaymentPage
                                             ? faEye
+                                            : moneyHolder.email === sessionData?.user?.email
+                                            ? faWarning
                                             : faHourglass
                                     }
                                 />

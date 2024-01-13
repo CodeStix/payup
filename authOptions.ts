@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import NextAuth, { AuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import sanitizeHtml from "sanitize-html";
 
 const prisma = new PrismaClient();
 
@@ -26,19 +27,20 @@ export const authOptions: AuthOptions = {
                 return false;
             }
 
+            const sanitizedUserName = user.name ? sanitizeHtml(user.name, { allowedTags: [], allowedAttributes: {} }) : null;
             const newUser = await prisma.user.upsert({
                 where: {
                     email: user.email,
                 },
                 create: {
                     email: user.email,
-                    userName: user.name,
+                    userName: sanitizedUserName,
                     avatarUrl: user.image,
                     allowOtherUserManualTranser: true,
                 },
                 update: {
                     email: user.email,
-                    userName: user.name,
+                    userName: sanitizedUserName,
                     avatarUrl: user.image,
                     lastLoginDate: new Date(),
                 },

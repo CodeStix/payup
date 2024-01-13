@@ -183,7 +183,7 @@ export default function HomePage() {
         try {
             const res = await fetch("/api/request", {
                 method: "POST",
-                body: JSON.stringify({ name: "New request", description: "" }),
+                body: JSON.stringify({ name: "New request" }),
             });
             if (res.ok) {
                 const req: { request: PaymentRequest } = await res.json();
