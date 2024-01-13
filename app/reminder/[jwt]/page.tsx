@@ -9,6 +9,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { AppText } from "@/components/AppHeader";
+import Confetti from "react-confetti";
 
 export default function Home({ params }: { params: { jwt: string } }) {
     const { data: reminder, isLoading: isLoadingReminder } = useSWR<
@@ -60,6 +61,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
                     </Heading>
                 ) : mailClickedPaid ? (
                     <Heading color="green.500" textAlign="center">
+                        <Confetti />
                         Thanks for confirming!
                     </Heading>
                 ) : (

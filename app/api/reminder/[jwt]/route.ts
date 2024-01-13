@@ -1,4 +1,4 @@
-import { JwtPayload, JwtPayloadReminder } from "@/notifications";
+import { JwtPayload } from "@/notifications";
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { PrismaClient } from "@prisma/client";

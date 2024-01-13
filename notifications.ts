@@ -5,6 +5,7 @@ import fs from "fs/promises";
 import { htmlToText } from "html-to-text";
 import { getUserDisplayName } from "./util";
 import { balanceToMoneyHolderReceiver } from "./balance";
+import sanitizeHtml from "sanitize-html";
 
 const prisma = new PrismaClient();
 
@@ -22,11 +23,6 @@ AWS.config.update({
 });
 
 let ses = new AWS.SES();
-
-export type JwtPayloadReminder = {
-    // Reminder id
-    m: number;
-};
 
 export type JwtPayload = {
     // User id that should receive money
@@ -143,22 +139,31 @@ export async function notifyPaymentReminders(all: boolean) {
 
     console.log("Sending", reminders.length, "payment reminders");
 
+    const sentMailTo = new Set<string>();
+
     for (const reminder of reminders) {
         const { moneyHolder, moneyReceiver, amount } = balanceToMoneyHolderReceiver(reminder);
+        if (sentMailTo.has(moneyReceiver.email)) {
+            continue;
+        }
 
         const remindLink = await generatePaymentReminderLink(moneyHolder.id, moneyReceiver.id, amount);
 
         console.log("Remind", moneyReceiver.email, "about", moneyHolder.email, "=", amount, process.env.NODE_ENV === "development" ? remindLink : "");
 
+        sentMailTo.add(moneyReceiver.email);
         try {
             await sendMail(
                 moneyReceiver.email,
                 `Did you receive ${amount.toFixed(2)} from ${getUserDisplayName(moneyHolder)}? Please confirm`,
                 getEmailHtml(emailTemplateString, {
-                    receiverUserName: getUserDisplayName(moneyReceiver),
-                    holderUserName: getUserDisplayName(moneyHolder),
+                    receiverUserName: sanitizeHtml(getUserDisplayName(moneyReceiver), { allowedTags: [], allowedAttributes: {} }),
+                    holderUserName: sanitizeHtml(getUserDisplayName(moneyHolder), { allowedTags: [], allowedAttributes: {} }),
                     amount: amount.toFixed(2),
-                    description: reminder.lastRelatingPaymentRequest?.name ?? "an unknown reason",
+                    description: sanitizeHtml(reminder.lastRelatingPaymentRequest?.name ?? "an unknown reason", {
+                        allowedTags: [],
+                        allowedAttributes: {},
+                    }),
                     holderUserNameAndIban: moneyHolder.iban
                         ? `${getUserDisplayName(moneyHolder)} (${moneyHolder.iban})`
                         : getUserDisplayName(moneyHolder),
@@ -238,10 +243,15 @@ export async function notifyUsers(all: boolean) {
 
     console.log("Found", balances.length, "balances to notify about", all ? "(all)" : "(timed)");
 
+    const sentMailTo = new Set<string>();
     for (const balance of balances) {
         const { moneyHolder, moneyReceiver, amount } = balanceToMoneyHolderReceiver(balance);
         if (moneyHolder.id === moneyReceiver.id) {
             console.warn("Row with self reference found", moneyHolder.id);
+            continue;
+        }
+
+        if (sentMailTo.has(moneyHolder.email)) {
             continue;
         }
 
@@ -262,16 +272,20 @@ export async function notifyUsers(all: boolean) {
             process.env.NODE_ENV === "development" ? paymentLink : ""
         );
 
+        sentMailTo.add(moneyHolder.email);
         try {
             await sendMail(
                 moneyHolder.email,
                 `You still owe ${getUserDisplayName(moneyReceiver)} money, pay up!`,
                 getEmailHtml(emailTemplateString, {
                     paymentLink,
-                    userName: getUserDisplayName(moneyHolder),
-                    paidByUserName: getUserDisplayName(moneyReceiver),
-                    paidByEmail: moneyReceiver.email,
-                    description: balance.lastRelatingPaymentRequest?.name ?? "an unknown reason",
+                    userName: sanitizeHtml(getUserDisplayName(moneyHolder), { allowedTags: [], allowedAttributes: {} }),
+                    paidByUserName: sanitizeHtml(getUserDisplayName(moneyReceiver), { allowedTags: [], allowedAttributes: {} }),
+                    paidByEmail: sanitizeHtml(moneyReceiver.email, { allowedTags: [], allowedAttributes: {} }),
+                    description: sanitizeHtml(balance.lastRelatingPaymentRequest?.name ?? "an unknown reason", {
+                        allowedTags: [],
+                        allowedAttributes: {},
+                    }),
                 })
             );
         } catch (ex) {
@@ -289,7 +303,7 @@ export async function notifyUsers(all: boolean) {
 
 async function sendMail(receiver: string, subject: string, body: string) {
     if (process.env.NODE_ENV === "development") {
-        if (!["reddusted@gmail.com", "stijn.rogiest@gmail.com", "stijnvantvijfde@gmail.com"].includes(receiver.toLowerCase())) {
+        if (true || !["reddusted@gmail.com", "stijn.rogiest@gmail.com", "stijnvantvijfde@gmail.com"].includes(receiver.toLowerCase())) {
             console.log("Skipped sending dev mail to", receiver, "about", subject);
             return;
         }

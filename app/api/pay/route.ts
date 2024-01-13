@@ -17,6 +17,9 @@ export async function POST(request: NextRequest, { params }: { params: { jwt: st
         moneyHolderId: number;
         moneyReceiverId: number;
     };
+    if (typeof body.moneyHolderId !== "number" || typeof body.moneyReceiverId !== "number") {
+        return NextResponse.json({ message: "Invalid body" }, { status: 400 });
+    }
 
     const { firstUserId, secondUserId } = moneyHolderReceiverToUsers(body.moneyHolderId, body.moneyReceiverId);
     const balance = await prisma.relativeUserBalance.findUnique({

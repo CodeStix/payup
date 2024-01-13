@@ -18,6 +18,10 @@ export async function GET(request: NextRequest, { params }: { params: { jwt: str
         return NextResponse.json({}, { status: 400 });
     }
 
+    if (jwtPayLoad.m !== undefined) {
+        return NextResponse.json({}, { status: 404 });
+    }
+
     const { firstUserId, secondUserId } = moneyHolderReceiverToUsers(jwtPayLoad.h, jwtPayLoad.r, jwtPayLoad.o);
     const balance = await prisma.relativeUserBalance.findUnique({
         where: {

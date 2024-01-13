@@ -1,3 +1,5 @@
+import sanitizeHtml from "sanitize-html";
+
 export const fetcher = (...args: any) => (fetch as any)(...args).then((res: any) => res.json());
 
 export function removeEmailDomain(email: string) {
@@ -31,4 +33,21 @@ export function getTotalParts(usersToPay: { partsOfAmount: number }[]) {
 
 export function calculateUserAmount(totalPaymentRequestParts: number, totalAmount: number, userParts: number) {
     return (userParts / totalPaymentRequestParts) * totalAmount;
+}
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function validateEmail(value: string) {
+    return EMAIL_REGEX.test(value);
+}
+
+export function validateStringOrUndefined(value: unknown, options: { maxLength: number; default?: string | undefined }): string | null | undefined {
+    if (typeof value !== "undefined") {
+        if (typeof value !== "string" || value.length > options.maxLength) {
+            return null;
+        }
+        return sanitizeHtml(value, { allowedTags: [], allowedAttributes: {} }) || null;
+    } else {
+        return options.default;
+    }
 }

@@ -12,40 +12,39 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     const query = request.nextUrl.searchParams.get("query");
-    if (typeof query !== "string" /* || query.length > 40 || query.length < 1*/) {
+    if (typeof query !== "string" || query.length > 40) {
         return NextResponse.json([]);
     }
 
     const users = await prisma.user.findMany({
         where: {
+            email: {
+                not: session.user.email,
+            },
             OR: [
                 {
                     email: query,
                 },
                 {
-                    AND: [
-                        {
-                            responders: {
-                                some: {
-                                    requester: {
-                                        email: session.user.email,
-                                    },
-                                },
+                    responders: {
+                        some: {
+                            requester: {
+                                email: session.user.email,
                             },
-                            OR: [
-                                {
-                                    email: {
-                                        mode: "insensitive",
-                                        contains: query,
-                                    },
-                                },
-                                {
-                                    userName: {
-                                        mode: "insensitive",
-                                        contains: query,
-                                    },
-                                },
-                            ],
+                        },
+                    },
+                    OR: [
+                        {
+                            email: {
+                                mode: "insensitive",
+                                contains: query,
+                            },
+                        },
+                        {
+                            userName: {
+                                mode: "insensitive",
+                                contains: query,
+                            },
                         },
                     ],
                 },
@@ -63,19 +62,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         },
     });
 
-    // if (!query) {
-    //     users.unshift(
-    //         await prisma.user.findUniqueOrThrow({
-    //             where: { email: session.user.email },
-    //             select: {
-    //                 email: true,
-    //                 avatarUrl: true,
-    //                 id: true,
-    //                 userName: true,
-    //             },
-    //         })
-    //     );
-    // }
+    users.unshift(
+        await prisma.user.findUniqueOrThrow({
+            where: { email: session.user.email },
+            select: {
+                email: true,
+                avatarUrl: true,
+                id: true,
+                userName: true,
+            },
+        })
+    );
 
     return NextResponse.json(users);
 }

@@ -2,7 +2,7 @@ import { PaymentRequestToUser, PrismaClient, PaymentRequest, PrismaPromise } fro
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/authOptions";
-import { calculateUserAmount, getTotalParts } from "@/util";
+import { calculateUserAmount, getTotalParts, validateStringOrUndefined } from "@/util";
 import { moneyHolderReceiverToUsers } from "@/balance";
 
 const prisma = new PrismaClient();
@@ -114,7 +114,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
             },
         });
 
-        if (body.recalculatePaymentRemoved) {
+        if (body.recalculatePaymentRemoved === true) {
             const totalParts = getTotalParts(deletedRequest.usersToPay);
             for (const userToPay of deletedRequest.usersToPay) {
                 const deletedAmountToPay = calculateUserAmount(totalParts, deletedRequest.amount, userToPay.partsOfAmount!);
@@ -164,6 +164,40 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         }[];
         published?: boolean;
     };
+
+    body.name = validateStringOrUndefined(body.name, { maxLength: 30 }) as string;
+    if (body.name === null) {
+        return NextResponse.json({ name: "Invalid name" }, { status: 400 });
+    }
+    body.description = validateStringOrUndefined(body.description, { maxLength: 150 }) as string;
+    if (body.description === null) {
+        return NextResponse.json({ description: "Invalid description" }, { status: 400 });
+    }
+    if (typeof body.amount !== "undefined" && (typeof body.amount !== "number" || body.amount < 0 || body.amount > 100000)) {
+        return NextResponse.json({ amount: "Invalid amount" }, { status: 400 });
+    }
+    if (typeof body.paidById !== "undefined" && typeof body.paidById !== "number") {
+        return NextResponse.json({ paidById: "Invalid paidById" }, { status: 400 });
+    }
+    if (typeof body.published !== "undefined" && typeof body.published !== "boolean") {
+        return NextResponse.json({ published: "Invalid published" }, { status: 400 });
+    }
+    if (typeof body.usersToPay !== "undefined") {
+        if (!Array.isArray(body.usersToPay)) {
+            return NextResponse.json({ usersToPay: "Invalid usersToPay" }, { status: 400 });
+        }
+        for (const userToPay of body.usersToPay) {
+            if (
+                typeof userToPay.partsOfAmount !== "undefined" &&
+                (typeof userToPay.partsOfAmount !== "number" || userToPay.partsOfAmount < 1 || userToPay.partsOfAmount > 100)
+            ) {
+                NextResponse.json({ usersToPay: "Invalid usersToPay.partsOfAmount" }, { status: 400 });
+            }
+            if (typeof userToPay.userId !== "undefined" && typeof userToPay.userId !== "number") {
+                NextResponse.json({ usersToPay: "Invalid usersToPay.userId" }, { status: 400 });
+            }
+        }
+    }
 
     const existingRequest = await prisma.paymentRequest.findUnique({
         where: {
@@ -464,9 +498,12 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                 id: true,
             },
         });
+
         await prisma.userToUser.createMany({
             skipDuplicates: true,
-            data: body.usersToPay.map((e) => ({ requesterId: currentUser.id, responderId: e.userId })),
+            data: body.usersToPay
+                .map((e) => ({ requesterId: currentUser.id, responderId: e.userId }))
+                .concat(body.usersToPay.map((e) => ({ requesterId: e.userId, responderId: currentUser.id }))),
         });
     }
 

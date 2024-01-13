@@ -195,7 +195,7 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                 throw new Error("Could not patch");
             }
 
-            console.log("set", { ...request, ...n });
+            // console.log("set", { ...request, ...n });
             await mutateRequest();
         } finally {
             setUpdating(false);
@@ -299,7 +299,6 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
         if (isNaN(amount)) {
             console.error("Invalid amount");
         } else if (amount !== request?.amount) {
-            console.log(amount, request?.amount);
             await patch({
                 amount: amount,
             });
@@ -996,11 +995,8 @@ function PaymentStatusButton(props: {
     );
     const [moneyHolder, moneyReceiver] =
         props.userToPay.userId === moneyHolderId ? [props.userToPay.user, props.request.paidBy] : [props.request.paidBy, props.userToPay.user];
-    // const moneyReceiver = props.userToPay.userId === moneyReceiverId ? props.userToPay.user : props.request.paidBy;
     const even = amount < 0.01;
     const openedPaymentPage = !!paymentPageOpenedDate;
-
-    console.log({ moneyHolder, moneyReceiver });
 
     return (
         <Popover>

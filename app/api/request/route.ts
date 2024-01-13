@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import { getServerSession } from "next-auth/next";
 import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/authOptions";
+import { validateStringOrUndefined } from "@/util";
 
 const prisma = new PrismaClient();
 
@@ -12,7 +13,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         return NextResponse.json({}, { status: 401 });
     }
 
-    const body = await request.json();
+    const body = (await request.json()) as { name?: string; description?: string };
+    body.name = validateStringOrUndefined(body.name, { maxLength: 30 }) as string;
+    if (body.name === null) {
+        return NextResponse.json({ name: "Invalid name" }, { status: 400 });
+    }
+    body.description = validateStringOrUndefined(body.description, { maxLength: 150 }) as string;
+    if (body.description === null) {
+        return NextResponse.json({ description: "Invalid description" }, { status: 400 });
+    }
 
     const newRequest = await prisma.paymentRequest.create({
         data: {
