@@ -32,8 +32,9 @@ export async function GET(request: NextRequest, { params }: { params: { jwt: str
                     email: true,
                     avatarUrl: true,
                     userName: true,
-                    iban: true,
-                    mollieApiKey: true,
+                    // iban: true,
+                    // mollieApiKey: true,
+                    preferredPaymentMethod: true,
                 },
             },
             secondUser: {
@@ -42,8 +43,9 @@ export async function GET(request: NextRequest, { params }: { params: { jwt: str
                     email: true,
                     avatarUrl: true,
                     userName: true,
-                    iban: true,
-                    mollieApiKey: true,
+                    // iban: true,
+                    // mollieApiKey: true,
+                    preferredPaymentMethod: true,
                 },
             },
             amount: true,
@@ -62,9 +64,7 @@ export async function GET(request: NextRequest, { params }: { params: { jwt: str
 
     const { amount, moneyHolder, moneyReceiver } = balanceToMoneyHolderReceiver(balance);
 
-    const paymentMethod = (jwtPayLoad.r === moneyReceiver.id ? moneyReceiver : moneyHolder).mollieApiKey ? "mollie" : "iban";
-    moneyReceiver.mollieApiKey = null;
-    moneyHolder.mollieApiKey = null;
+    const paymentMethod = (jwtPayLoad.r === moneyReceiver.id ? moneyReceiver : moneyHolder).preferredPaymentMethod;
 
     return NextResponse.json({
         balance: {

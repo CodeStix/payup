@@ -1,9 +1,9 @@
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/authOptions";
-import { PrismaClient } from "@prisma/client";
+import { PaymentMethod, PrismaClient } from "@prisma/client";
 import iban from "iban";
-import { validateEmail } from "@/util";
+import { isValidPaymentMethod, validateEmail } from "@/util";
 
 const prisma = new PrismaClient();
 
@@ -25,6 +25,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             iban: true,
             registerDate: true,
             allowOtherUserManualTranser: true,
+            preferredPaymentMethod: true,
         },
     });
 
@@ -37,15 +38,25 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
         return NextResponse.json({}, { status: 401 });
     }
 
-    const body = (await request.json()) as { iban?: string; mollieApiKey?: string; allowOtherUserManualTranser?: boolean };
-    if (typeof body.mollieApiKey !== undefined) {
+    const body = (await request.json()) as {
+        iban?: string;
+        mollieApiKey?: string;
+        allowOtherUserManualTranser?: boolean;
+        preferredPaymentMethod?: PaymentMethod;
+    };
+    if (typeof body.mollieApiKey !== "undefined") {
         if (typeof body.mollieApiKey !== "string") {
             return NextResponse.json({ mollieApiKey: "Invalid API key" }, { status: 400 });
         }
     }
-    if (typeof body.iban !== undefined) {
+    if (typeof body.iban !== "undefined") {
         if (typeof body.iban !== "string" || !iban.isValid(body.iban)) {
             return NextResponse.json({ iban: "Invalid IBAN" }, { status: 400 });
+        }
+    }
+    if (typeof body.preferredPaymentMethod !== "undefined") {
+        if (typeof body.preferredPaymentMethod !== "string" || !isValidPaymentMethod(body.preferredPaymentMethod)) {
+            return NextResponse.json({ iban: "Invalid payment method" }, { status: 400 });
         }
     }
 
@@ -54,6 +65,7 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
             email: session.user.email,
         },
         data: {
+            preferredPaymentMethod: body.preferredPaymentMethod || undefined,
             mollieApiKey: body.mollieApiKey || undefined,
             iban: body.iban || undefined,
             allowOtherUserManualTranser: typeof body.allowOtherUserManualTranser === "boolean" ? body.allowOtherUserManualTranser : undefined,

@@ -4,7 +4,7 @@ import { fetcher, getUserDisplayName, removeEmailDomain } from "@/util";
 import { Button, Text, Center, Heading, Skeleton, AlertTitle, Alert, AlertIcon, Flex, Link, Avatar } from "@chakra-ui/react";
 import { faArrowRight, faCheckCircle, faClipboard, faClipboardCheck } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { RelativeUserBalance, User } from "@prisma/client";
+import { PaymentMethod, RelativeUserBalance, User } from "@prisma/client";
 import { signIn, signOut, useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -21,7 +21,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
         amount: number;
         balance: RelativeUserBalance & { lastRelatingPaymentRequest?: { name: string }; moneyHolder: User; moneyReceiver: User };
         user: User;
-        paymentMethod: "mollie" | "iban";
+        paymentMethod: PaymentMethod;
     }>(`/api/pay/${params.jwt}`, fetcher, {
         revalidateOnReconnect: false,
         revalidateOnFocus: false,
@@ -81,7 +81,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
 
     useEffect(() => {
         if (link) {
-            if (shouldPayMoney && link.paymentMethod === "iban") {
+            if (shouldPayMoney && link.paymentMethod === "IBAN") {
                 // Pay automatically
                 if (!paidRef.current) {
                     paidRef.current = true;
@@ -111,7 +111,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
                     <Heading as="h2" color="yellow.500" textAlign="center">
                         {link?.balance.moneyHolder && getUserDisplayName(link.balance.moneyHolder)} still ows you €{link?.balance.amount?.toFixed(2)}!
                     </Heading>
-                ) : link?.paymentMethod === "iban" && previouslyOpenedAt ? (
+                ) : link?.paymentMethod === "IBAN" && previouslyOpenedAt ? (
                     <Heading color="yellow.500" textAlign="center">
                         You could still be owing €{link?.amount?.toFixed(2)} to{" "}
                         {link?.balance.moneyReceiver && getUserDisplayName(link.balance.moneyReceiver)}!
@@ -157,7 +157,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
             </Skeleton>
 
             {/* && (!lastPaymentDate || new Date().getTime() - new Date(lastPaymentDate).getTime() > 60 * 1000) */}
-            {link?.paymentMethod === "iban" && previouslyOpenedAt && (
+            {link?.paymentMethod === "IBAN" && previouslyOpenedAt && (
                 <Alert status="warning" rounded="lg" w="xs" flexDir="column" textAlign="center">
                     <Flex>
                         <AlertIcon />
@@ -170,7 +170,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
             <Skeleton isLoaded={!!link}>
                 {!paid && shouldPayMoney && (
                     <>
-                        {link?.paymentMethod === "mollie" ? (
+                        {link?.paymentMethod === "MOLLIE" ? (
                             <Button
                                 isDisabled={loading || isLoadingLink || paid}
                                 isLoading={loading || isLoadingLink}
@@ -194,7 +194,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
                                 leftIcon={<FontAwesomeIcon icon={copied ? faClipboardCheck : faClipboard} />}
                                 // rightIcon={<FontAwesomeIcon icon={faArrowRight} />}
                                 onClick={() => {
-                                    if (link && link.paymentMethod === "iban") {
+                                    if (link && link.paymentMethod === "IBAN") {
                                         void navigator.clipboard.writeText(link.balance.moneyReceiver.iban!);
                                         setCopied(true);
                                     }
@@ -210,7 +210,7 @@ export default function Home({ params }: { params: { jwt: string } }) {
                 <Text style={{ opacity: "0.5", maxWidth: "500px", textAlign: "center", minHeight: "2rem" }} textAlign="center">
                     {shouldPayMoney && (
                         <>
-                            {link?.paymentMethod === "mollie" ? (
+                            {link?.paymentMethod === "MOLLIE" ? (
                                 <>
                                     {getUserDisplayName(link.balance.moneyReceiver)} selected{" "}
                                     <Link target="_blank" href="https://mollie.com">

@@ -10,16 +10,22 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum PaymentMethod {
+  MOLLIE
+  IBAN
+}
+
 model User {
-  id                          Int      @id @default(autoincrement())
+  id                          Int           @id @default(autoincrement())
   userName                    String?
-  email                       String   @unique
-  registerDate                DateTime @default(now())
-  lastLoginDate               DateTime @default(now())
+  email                       String        @unique
+  registerDate                DateTime      @default(now())
+  lastLoginDate               DateTime      @default(now())
   avatarUrl                   String?
   iban                        String?
   mollieApiKey                String?
-  allowOtherUserManualTranser Boolean  @default(true)
+  allowOtherUserManualTranser Boolean       @default(true)
+  preferredPaymentMethod      PaymentMethod @default(IBAN)
 
   paymentRequests PaymentRequest[]       @relation("owner")
   requestedToPay  PaymentRequestToUser[]

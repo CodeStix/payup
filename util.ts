@@ -1,3 +1,4 @@
+import { PaymentMethod } from "@prisma/client";
 import sanitizeHtml from "sanitize-html";
 
 export const fetcher = (...args: any) => (fetch as any)(...args).then((res: any) => res.json());
@@ -50,4 +51,10 @@ export function validateStringOrUndefined(value: unknown, options: { maxLength: 
     } else {
         return options.default;
     }
+}
+
+export const paymentMethods: PaymentMethod[] = ["IBAN", "MOLLIE"];
+
+export function isValidPaymentMethod(value: string) {
+    return paymentMethods.includes(value as PaymentMethod);
 }
