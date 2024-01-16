@@ -89,13 +89,17 @@ import {
     faMoneyBill,
     faMoneyBill1Wave,
     faMoneyCheck,
+    faPen,
     faPlus,
+    faQuestion,
+    faQuestionCircle,
     faSave,
     faSearch,
     faSubtract,
     faTimes,
     faTrash,
     faUserCheck,
+    faUserGraduate,
     faWarning,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -133,6 +137,7 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
     const { isOpen: manualPaymentIsOpen, onOpen: manualPaymentOnOpen, onClose: manualPaymentOnClose } = useDisclosure();
     const [generatedPaymentLink, setGeneratedPaymentLink] = useState("");
     const [manualPaymentMoneyHolder, setManualPaymentMoneyHolder] = useState<User>();
+    const amountInputRef = useRef<HTMLInputElement>(null);
     // const [showOpenPaymentLinkButton, setShowOpenPaymentLinkButton] = useState(false);
 
     const totalParts = useMemo(() => {
@@ -398,6 +403,7 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                                     </InputLeftElement>
 
                                     <Input
+                                        ref={amountInputRef}
                                         autoFocus
                                         onBlur={(ev) => {
                                             setAmount(ev.target.value);
@@ -521,10 +527,10 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                         </UnorderedList>
                     </Skeleton>
 
-                    {(request?.usersToPay.length ?? 0) > 0 && <Divider />}
+                    {/* {(request?.usersToPay.length ?? 0) > 0 && <Divider />} */}
 
                     <Skeleton isLoaded={!!request}>
-                        <Text as="p" fontWeight="bold" color="blue.500">
+                        <Text as="p" fontWeight="bold" color="red.500">
                             <FontAwesomeIcon icon={faCoins} /> User that paid
                         </Text>
 
@@ -546,6 +552,41 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                                     </Text>
                                 </Tooltip>
                             )}
+
+                            <Spacer />
+
+                            <Button
+                                onClick={() => amountInputRef.current?.focus()}
+                                variant="link"
+                                color="red.500"
+                                mx={1}
+                                fontWeight="semibold"
+                                whiteSpace="nowrap">
+                                € {request?.amount?.toFixed(2)}
+                            </Button>
+
+                            <Popover>
+                                <PopoverTrigger>
+                                    <IconButton
+                                        isDisabled={isUpdating}
+                                        size="sm"
+                                        colorScheme="blue"
+                                        variant="solid"
+                                        aria-label="Set paying user"
+                                        icon={<FontAwesomeIcon icon={faPen} />}></IconButton>
+                                </PopoverTrigger>
+                                <PopoverContent>
+                                    <PopoverArrow />
+                                    <PopoverCloseButton />
+                                    <PopoverHeader fontWeight="semibold">Change paying user</PopoverHeader>
+                                    <PopoverBody>
+                                        <Text>
+                                            You can change the paying user using the list below by clicking the circle next to their name and clicking
+                                            'Set as paying user'
+                                        </Text>
+                                    </PopoverBody>
+                                </PopoverContent>
+                            </Popover>
                         </Flex>
                     </Skeleton>
 
@@ -730,7 +771,7 @@ function PayingUserListItem(props: {
                 <PopoverContent>
                     <PopoverArrow />
                     <PopoverCloseButton />
-                    <PopoverHeader>Fraction of total amount</PopoverHeader>
+                    <PopoverHeader fontWeight="semibold">Fraction of total amount</PopoverHeader>
                     <PopoverBody>
                         <Flex alignItems="center" gap={2}>
                             <IconButton
@@ -1050,7 +1091,7 @@ function PaymentStatusButton(props: {
             <PopoverContent>
                 <PopoverArrow />
                 <PopoverCloseButton />
-                <PopoverHeader>Payment status</PopoverHeader>
+                <PopoverHeader fontWeight="semibold">Payment status</PopoverHeader>
                 <PopoverBody display="flex" gap={2} flexDir="column">
                     {!props.request.published && (
                         <Alert status="warning" flexDir="column" rounded="lg">
@@ -1124,6 +1165,20 @@ function PaymentStatusButton(props: {
                         <></>
                     )}
 
+                    {moneyReceiver.id !== moneyHolder.id && (
+                        <Tooltip placement="top" hasArrow label={"Click this button if this user paid for everyone."}>
+                            <Button
+                                isDisabled={props.isDisabled}
+                                variant="outline"
+                                onClick={props.onSetPayingUser}
+                                colorScheme="blue"
+                                // size="sm"
+                                leftIcon={<FontAwesomeIcon icon={faUserGraduate} />}>
+                                Set as paying user
+                            </Button>
+                        </Tooltip>
+                    )}
+
                     {moneyHolder.id !== moneyReceiver.id && (
                         <Button
                             isDisabled={props.isDisabled}
@@ -1131,20 +1186,8 @@ function PaymentStatusButton(props: {
                             onClick={props.onManualPayment}
                             colorScheme="blue"
                             size="sm"
-                            leftIcon={<FontAwesomeIcon icon={faMoneyBill} />}>
+                            leftIcon={<FontAwesomeIcon icon={faHandHoldingDollar} />}>
                             Add manual payment
-                        </Button>
-                    )}
-
-                    {moneyReceiver.id !== moneyHolder.id && (
-                        <Button
-                            isDisabled={props.isDisabled}
-                            variant="ghost"
-                            onClick={props.onSetPayingUser}
-                            colorScheme="blue"
-                            size="sm"
-                            leftIcon={<FontAwesomeIcon icon={faUserCheck} />}>
-                            Set as paying user
                         </Button>
                     )}
                 </PopoverBody>
