@@ -135,6 +135,8 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
     );
     const { isOpen: paymentLinkIsOpen, onOpen: paymentLinkOnOpen, onClose: paymentLinkOnClose } = useDisclosure();
     const { isOpen: manualPaymentIsOpen, onOpen: manualPaymentOnOpen, onClose: manualPaymentOnClose } = useDisclosure();
+    const { isOpen: ibanDialogIsOpen, onOpen: ibanDialogOnOpen, onClose: ibanDialogOnClose } = useDisclosure();
+    const { isOpen: publishInfoIsOpen, onOpen: publishInfoOnOpen, onClose: publishInfoOnClose } = useDisclosure();
     const [generatedPaymentLink, setGeneratedPaymentLink] = useState("");
     const [manualPaymentMoneyHolder, setManualPaymentMoneyHolder] = useState<User>();
     const amountInputRef = useRef<HTMLInputElement>(null);
@@ -640,7 +642,12 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                             w="full"
                             colorScheme={request?.published ? "red" : "green"}
                             leftIcon={<FontAwesomeIcon icon={request?.published ? faBan : faBullhorn} />}
-                            onClick={() => void patch({ published: !request!.published })}>
+                            onClick={async () => {
+                                await patch({ published: !request!.published });
+                                if (!request!.published) {
+                                    publishInfoOnOpen();
+                                }
+                            }}>
                             {request?.published ? <>Unpublish</> : <>Save & Publish</>}
                         </Button>
                     </Skeleton>
@@ -713,7 +720,37 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                     }}
                 />
             )}
+            <PublishInfoModal isOpen={publishInfoIsOpen} onClose={publishInfoOnClose} />
         </Flex>
+    );
+}
+
+function PublishInfoModal(props: { isOpen: boolean; onClose: () => void }) {
+    return (
+        <Modal isOpen={props.isOpen} onClose={props.onClose}>
+            <ModalOverlay />
+            <ModalContent>
+                <ModalHeader color="green.500" fontWeight="semibold">
+                    <FontAwesomeIcon icon={faCheckCircle} /> Published
+                </ModalHeader>
+                <ModalCloseButton />
+                <ModalBody>
+                    {/* <Text color="green.500" fontWeight="semibold">
+                        <FontAwesomeIcon icon={faCheckCircle} /> Your payment request is now published.
+                    </Text> */}
+                    <Text>
+                        Paying users will keep receiving notifications while you wait. When an user has opened the payment link, you'll receive a
+                        notification a couple of days later, to confirm the payment.
+                    </Text>
+                </ModalBody>
+
+                <ModalFooter>
+                    <Button w="full" colorScheme="green" onClick={props.onClose}>
+                        OK
+                    </Button>
+                </ModalFooter>
+            </ModalContent>
+        </Modal>
     );
 }
 
