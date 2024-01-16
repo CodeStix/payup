@@ -110,6 +110,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import QRCode from "react-qr-code";
 import { balanceToMoneyHolderReceiver } from "@/balance";
+import { PaymentMethodModal } from "@/components/PaymentMethodModal";
 
 export default function PaymentRequestDetailPage({ params }: { params: { id: string } }) {
     const router = useRouter();
@@ -135,7 +136,7 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
     );
     const { isOpen: paymentLinkIsOpen, onOpen: paymentLinkOnOpen, onClose: paymentLinkOnClose } = useDisclosure();
     const { isOpen: manualPaymentIsOpen, onOpen: manualPaymentOnOpen, onClose: manualPaymentOnClose } = useDisclosure();
-    const { isOpen: ibanDialogIsOpen, onOpen: ibanDialogOnOpen, onClose: ibanDialogOnClose } = useDisclosure();
+    const { isOpen: paymentMethodIsOpen, onOpen: paymentMethodOnOpen, onClose: paymentMethodOnClose } = useDisclosure();
     const { isOpen: publishInfoIsOpen, onOpen: publishInfoOnOpen, onClose: publishInfoOnClose } = useDisclosure();
     const [generatedPaymentLink, setGeneratedPaymentLink] = useState("");
     const [manualPaymentMoneyHolder, setManualPaymentMoneyHolder] = useState<User>();
@@ -198,12 +199,14 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                 body: JSON.stringify(n),
             });
             if (!res.ok) {
-                console.error(res.status, await res.text());
-                throw new Error("Could not patch");
+                const errorData = await res.json();
+                console.error("Could not patch", errorData);
+                return errorData;
             }
 
             // console.log("set", { ...request, ...n });
             await mutateRequest();
+            return undefined;
         } finally {
             setUpdating(false);
         }
@@ -351,6 +354,23 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
         } finally {
             setUpdating(false);
         }
+    }
+
+    async function publish() {
+        const errors = await patch({ published: true });
+        if (errors) {
+            if (errors["published"] === "no-payment-method") {
+                paymentMethodOnOpen();
+            } else {
+                console.error("Unknown problem while publishing", errors);
+            }
+        } else {
+            publishInfoOnOpen();
+        }
+    }
+
+    async function unpublish() {
+        await patch({ published: false });
     }
 
     useEffect(() => {
@@ -643,9 +663,10 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                             colorScheme={request?.published ? "red" : "green"}
                             leftIcon={<FontAwesomeIcon icon={request?.published ? faBan : faBullhorn} />}
                             onClick={async () => {
-                                await patch({ published: !request!.published });
                                 if (!request!.published) {
-                                    publishInfoOnOpen();
+                                    void publish();
+                                } else {
+                                    void unpublish();
                                 }
                             }}>
                             {request?.published ? <>Unpublish</> : <>Save & Publish</>}
@@ -720,12 +741,26 @@ export default function PaymentRequestDetailPage({ params }: { params: { id: str
                     }}
                 />
             )}
-            <PublishInfoModal isOpen={publishInfoIsOpen} onClose={publishInfoOnClose} />
+            {request && <PublishInfoModal paidByUser={request?.paidBy} isOpen={publishInfoIsOpen} onClose={publishInfoOnClose} />}
+            {request && (
+                <PaymentMethodModal
+                    notOwnUserId={sessionData?.user?.email === request?.paidBy.email ? undefined : request?.paidBy.id}
+                    isOpen={paymentMethodIsOpen}
+                    onClose={(cancelled) => {
+                        paymentMethodOnClose();
+
+                        if (!cancelled) {
+                            void publish();
+                        }
+                    }}
+                />
+            )}
         </Flex>
     );
 }
 
-function PublishInfoModal(props: { isOpen: boolean; onClose: () => void }) {
+function PublishInfoModal(props: { isOpen: boolean; onClose: () => void; paidByUser: User }) {
+    const { data: sessionData } = useSession();
     return (
         <Modal isOpen={props.isOpen} onClose={props.onClose}>
             <ModalOverlay />
@@ -739,8 +774,9 @@ function PublishInfoModal(props: { isOpen: boolean; onClose: () => void }) {
                         <FontAwesomeIcon icon={faCheckCircle} /> Your payment request is now published.
                     </Text> */}
                     <Text>
-                        Paying users will keep receiving notifications while you wait. When an user has opened the payment link, you'll receive a
-                        notification a couple of days later, to confirm the payment.
+                        Paying users will keep receiving notifications while {getUserDisplayName(props.paidByUser, sessionData?.user)} wait(s). When
+                        an user has opened the payment link, {getUserDisplayName(props.paidByUser, sessionData?.user)} will receive a notification a
+                        couple of days later, to confirm the payment.
                     </Text>
                 </ModalBody>
 

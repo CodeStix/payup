@@ -69,6 +69,7 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
             mollieApiKey: body.mollieApiKey || undefined,
             iban: body.iban || undefined,
             allowOtherUserManualTranser: typeof body.allowOtherUserManualTranser === "boolean" ? body.allowOtherUserManualTranser : undefined,
+            verifiedPaymentMethod: true,
         },
     });
 
@@ -89,6 +90,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const newUser = await prisma.user.create({
         data: {
             email: body.email,
+            verifiedPaymentMethod: false,
             // userName: body.userName || undefined,
             responders: {
                 create: {

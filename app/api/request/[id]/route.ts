@@ -38,6 +38,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
                     id: true,
                     userName: true,
                     avatarUrl: true,
+                    preferredPaymentMethod: true,
                 },
             },
             usersToPay: {
@@ -210,6 +211,13 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
             paidById: true,
             amount: true,
             published: true,
+            paidBy: {
+                select: {
+                    preferredPaymentMethod: true,
+                    iban: true,
+                    mollieApiKey: true,
+                },
+            },
             usersToPay: {
                 select: {
                     userId: true,
@@ -226,6 +234,14 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     if (!existingRequest) {
         return NextResponse.json(undefined, { status: 404 });
+    }
+    if (
+        typeof body.published === "boolean" &&
+        body.published &&
+        !(existingRequest.paidBy.preferredPaymentMethod === "IBAN" ? existingRequest.paidBy.iban : existingRequest.paidBy.mollieApiKey)
+    ) {
+        // The user that paid doesn't have a payment method configured
+        return NextResponse.json({ published: "no-payment-method" }, { status: 400 });
     }
 
     let prismaOperations: PrismaPromise<any>[] = [];

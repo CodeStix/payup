@@ -37,12 +37,14 @@ export const authOptions: AuthOptions = {
                     userName: sanitizedUserName,
                     avatarUrl: user.image,
                     allowOtherUserManualTranser: true,
+                    verifiedPaymentMethod: true,
                 },
                 update: {
                     email: user.email,
                     userName: sanitizedUserName,
                     avatarUrl: user.image,
                     lastLoginDate: new Date(),
+                    verifiedPaymentMethod: true,
                 },
             });
 

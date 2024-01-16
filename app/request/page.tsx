@@ -49,24 +49,10 @@ import { PaymentMethodModal } from "@/components/PaymentMethodModal";
 
 function UserSettingsModal(props: { isOpen: boolean; onClose: () => void }) {
     const { data: user, isLoading: isLoadingUser } = useSWR<User>("/api/user", fetcher);
-    const [iban, setIban] = useState("");
-    const [mollieApiKey, setMollieApiKey] = useState("");
     const [allowOtherUserManualTranser, setAllowOtherUserManualTranser] = useState(false);
     const [saving, setSaving] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const { isOpen: paymentMethodIsOpen, onOpen: paymentMethodOnOpen, onClose: paymentMethodOnClose } = useDisclosure();
-
-    useEffect(() => {
-        if (typeof user?.iban === "string") {
-            setIban(user.iban);
-        }
-    }, [user?.iban]);
-
-    useEffect(() => {
-        if (typeof user?.mollieApiKey === "string") {
-            setMollieApiKey(user.mollieApiKey);
-        }
-    }, [user?.mollieApiKey]);
 
     useEffect(() => {
         if (typeof user?.allowOtherUserManualTranser === "boolean") {
@@ -81,8 +67,6 @@ function UserSettingsModal(props: { isOpen: boolean; onClose: () => void }) {
             const res = await fetch("/api/user", {
                 method: "PATCH",
                 body: JSON.stringify({
-                    mollieApiKey,
-                    iban,
                     allowOtherUserManualTranser,
                 }),
             });
@@ -108,44 +92,15 @@ function UserSettingsModal(props: { isOpen: boolean; onClose: () => void }) {
                             ev.preventDefault();
                             void saveChanges();
                         }}>
-                        <Button leftIcon={<FontAwesomeIcon icon={faMoneyBill} />} onClick={() => paymentMethodOnOpen()}>
-                            Set up payment method
-                        </Button>
-
                         <ModalBody display="flex" flexDir="column" gap={4}>
-                            <FormControl isInvalid={"iban" in errors} isDisabled={saving || isLoadingUser}>
-                                <FormLabel>IBAN</FormLabel>
-                                <Input type="text" value={iban} onChange={(ev) => setIban(ev.target.value)} />
-                                {"iban" in errors ? (
-                                    <FormErrorMessage>{errors["iban"]}</FormErrorMessage>
-                                ) : (
-                                    <FormHelperText>
-                                        This is required if you want to accept payments via your banking number. People can only send money to this
-                                        address.
-                                    </FormHelperText>
-                                )}
-                            </FormControl>
-
-                            <FormControl isInvalid={"mollieApiKey" in errors} isDisabled={saving || isLoadingUser}>
-                                <FormLabel>Mollie API key</FormLabel>
-                                <Input
-                                    placeholder="example: test_xxxxxxxxxx"
-                                    type="text"
-                                    value={mollieApiKey}
-                                    onChange={(ev) => setMollieApiKey(ev.target.value)}
-                                />
-                                {"mollieApiKey" in errors ? (
-                                    <FormErrorMessage>{errors["mollieApiKey"]}</FormErrorMessage>
-                                ) : (
-                                    <FormHelperText>
-                                        Optional. Visit the{" "}
-                                        <Link target="_blank" href="https://mollie.com">
-                                            mollie
-                                        </Link>{" "}
-                                        site to see what&apos;s up.
-                                    </FormHelperText>
-                                )}
-                            </FormControl>
+                            <Button
+                                colorScheme="blue"
+                                size="lg"
+                                // leftIcon={<FontAwesomeIcon icon={faMoneyBill} />}
+                                rightIcon={<FontAwesomeIcon icon={faArrowRight} />}
+                                onClick={() => paymentMethodOnOpen()}>
+                                Set up payment method
+                            </Button>
 
                             <FormControl isInvalid={"allowOtherUserManualTranser" in errors} isDisabled={saving || isLoadingUser}>
                                 <FormLabel>Allow others to manage payments for you</FormLabel>
@@ -168,7 +123,13 @@ function UserSettingsModal(props: { isOpen: boolean; onClose: () => void }) {
                             <Button type="button" variant="ghost" colorScheme="blue" mr={3} onClick={props.onClose}>
                                 Cancel
                             </Button>
-                            <Button isLoading={saving} colorScheme="green" isDisabled={saving} type="submit" variant="solid">
+                            <Button
+                                rightIcon={<FontAwesomeIcon icon={faCheck} />}
+                                isLoading={saving}
+                                colorScheme="green"
+                                isDisabled={saving}
+                                type="submit"
+                                variant="solid">
                                 Save changes
                             </Button>
                         </ModalFooter>

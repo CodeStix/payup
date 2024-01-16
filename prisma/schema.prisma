@@ -26,6 +26,7 @@ model User {
   mollieApiKey                String?
   allowOtherUserManualTranser Boolean       @default(true)
   preferredPaymentMethod      PaymentMethod @default(IBAN)
+  verifiedPaymentMethod       Boolean       @default(false)
 
   paymentRequests PaymentRequest[]       @relation("owner")
   requestedToPay  PaymentRequestToUser[]

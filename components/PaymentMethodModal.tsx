@@ -1,4 +1,4 @@
-import { capitalize, fetcher, paymentMethods } from "@/util";
+import { capitalize, fetcher, getUserDisplayName, paymentMethods } from "@/util";
 import {
     Modal,
     Text,
@@ -19,19 +19,32 @@ import {
     Link,
     Skeleton,
 } from "@chakra-ui/react";
-import { faArrowRight } from "@fortawesome/free-solid-svg-icons";
+import { faArrowRight, faCheck } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { PaymentMethod, User } from "@prisma/client";
+import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import useSWR from "swr";
 
-export function PaymentMethodModal(props: { isOpen: boolean; onClose: (cancelled: boolean) => void }) {
-    const { data: user, isLoading: isLoadingUser } = useSWR<User>("/api/user", fetcher);
+export function PaymentMethodModal(props: { isOpen: boolean; onClose: (cancelled: boolean) => void; notOwnUserId?: number }) {
+    const { data: sessionData } = useSession();
+    const { data: user, isLoading: isLoadingUser } = useSWR<User>(
+        props.isOpen ? (props.notOwnUserId ? `/api/user/${props.notOwnUserId}` : "/api/user") : undefined,
+        fetcher
+    );
     const [iban, setIban] = useState("");
     const [mollieApiKey, setMollieApiKey] = useState("");
     const [method, setMethod] = useState<PaymentMethod>();
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [saving, setSaving] = useState(false);
+
+    console.log("notOwnUserId", props.notOwnUserId);
+
+    useEffect(() => {
+        if (props.isOpen) {
+            setErrors({});
+        }
+    }, [props.isOpen]);
 
     useEffect(() => {
         if (!method && typeof user?.preferredPaymentMethod === "string") {
@@ -49,7 +62,7 @@ export function PaymentMethodModal(props: { isOpen: boolean; onClose: (cancelled
         setSaving(true);
         setErrors({});
         try {
-            const res = await fetch("/api/user", {
+            const res = await fetch(props.notOwnUserId ? `/api/user/${props.notOwnUserId}` : "/api/user", {
                 method: "PATCH",
                 body: JSON.stringify({
                     preferredPaymentMethod: method,
@@ -79,9 +92,14 @@ export function PaymentMethodModal(props: { isOpen: boolean; onClose: (cancelled
                         void saveChanges();
                     }}>
                     <ModalBody gap={6} display="flex" flexDir="column">
-                        <Flex alignItems="center">
-                            <Text>How do you want your friends to pay you?</Text>
-                            <Select w="200px" variant="filled" value={method} onChange={(ev) => setMethod(ev.target.value as PaymentMethod)}>
+                        <Flex gap={2} alignItems="center">
+                            <Text>How would {user && getUserDisplayName(user, sessionData?.user)} like to get paid?</Text>
+                            <Select
+                                isDisabled={!!props.notOwnUserId}
+                                w="200px"
+                                variant="filled"
+                                value={method}
+                                onChange={(ev) => setMethod(ev.target.value as PaymentMethod)}>
                                 {paymentMethods.map((e) => (
                                     <option key={e}>{e}</option>
                                 ))}
@@ -91,7 +109,9 @@ export function PaymentMethodModal(props: { isOpen: boolean; onClose: (cancelled
                         <Skeleton isLoaded={!isLoadingUser}>
                             {method === "IBAN" && (
                                 <FormControl isInvalid={"iban" in errors} isDisabled={saving || isLoadingUser}>
-                                    <FormLabel>IBAN</FormLabel>
+                                    <FormLabel>
+                                        {props.notOwnUserId ? <>{user && getUserDisplayName(user, sessionData?.user)}'s IBAN</> : "IBAN"}
+                                    </FormLabel>
                                     <Input
                                         autoFocus
                                         placeholder="example: NLxx xxxx xxxx xxxx"
@@ -103,7 +123,8 @@ export function PaymentMethodModal(props: { isOpen: boolean; onClose: (cancelled
                                         <FormErrorMessage>{errors["iban"]}</FormErrorMessage>
                                     ) : (
                                         <FormHelperText>
-                                            You can only receive money using this number. You can find this in your banking app.
+                                            {user && getUserDisplayName(user, sessionData?.user)} can only receive money using this number. You can
+                                            find this in your banking app.
                                         </FormHelperText>
                                     )}
                                 </FormControl>
@@ -136,14 +157,10 @@ export function PaymentMethodModal(props: { isOpen: boolean; onClose: (cancelled
                     </ModalBody>
 
                     <ModalFooter>
-                        <Button mr={3} variant="ghost" onClick={() => props.onClose(true)}>
-                            Close
+                        <Button colorScheme="blue" mr={3} variant="ghost" onClick={() => props.onClose(true)}>
+                            Cancel
                         </Button>
-                        <Button
-                            rightIcon={<FontAwesomeIcon icon={faArrowRight} />}
-                            isDisabled={isLoadingUser || saving}
-                            colorScheme="green"
-                            type="submit">
+                        <Button rightIcon={<FontAwesomeIcon icon={faCheck} />} isDisabled={isLoadingUser || saving} colorScheme="green" type="submit">
                             Save
                         </Button>
                     </ModalFooter>
