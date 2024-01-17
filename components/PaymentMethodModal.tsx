@@ -38,8 +38,6 @@ export function PaymentMethodModal(props: { isOpen: boolean; onClose: (cancelled
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [saving, setSaving] = useState(false);
 
-    console.log("notOwnUserId", props.notOwnUserId);
-
     useEffect(() => {
         if (props.isOpen) {
             setErrors({});

@@ -183,8 +183,8 @@ export default function HomePage() {
 
                 <Divider />
 
-                <Skeleton isLoaded={!isLoading && !isLoadingUser} minHeight={"4rem"}>
-                    <Flex flexDir="column" gap="1rem">
+                <Flex flexDir="column" gap="1rem">
+                    <Skeleton isLoaded={!isLoading && !isLoadingUser}>
                         <Button
                             isLoading={loading}
                             isDisabled={loading}
@@ -194,70 +194,71 @@ export default function HomePage() {
                             leftIcon={<FontAwesomeIcon icon={faPlus} />}>
                             Create new payment request
                         </Button>
+                    </Skeleton>
 
-                        {data?.requests?.map((e) => (
-                            <Card
-                                key={e.id}
-                                // colorScheme="green"
-                                background="#eee"
-                                shadow="none"
-                                border="1px solid transparent"
-                                _hover={{ /*transform: "translate(0, -5px)",*/ background: "white", border: "1px solid #eee" }}
-                                style={{ transition: "100ms" }}
-                                cursor="pointer"
-                                onClick={() => router.push(`/request/${e.id}`)}>
-                                <CardHeader>
-                                    <Flex alignItems="center">
-                                        <Box>
-                                            <Heading size="md">{e.name}</Heading>
-                                            <Text>{getUserDisplayName(e.paidBy)} paid</Text>
-                                        </Box>
-                                        <Spacer />
-                                        <Text fontSize="x-large">€{e.amount.toFixed(2)}</Text>
-                                    </Flex>
-                                    {!e.published && (
-                                        <Badge variant="solid" colorScheme="red">
-                                            Not published yet
-                                        </Badge>
-                                    )}
-                                </CardHeader>
-                                <CardBody pt={0}>
-                                    <Flex alignItems="center" gap={4}>
-                                        <Tooltip openDelay={200} label={e.usersToPay.map((e) => getUserDisplayName(e.user)).join(", ")}>
-                                            <AvatarGroup size="md" max={5}>
-                                                {e.usersToPay.map((u) => {
-                                                    return (
-                                                        <Avatar
-                                                            key={u.user.id}
-                                                            name={u.user.userName || u.user.email}
-                                                            src={u.user.avatarUrl || undefined}>
-                                                            {/* <AvatarBadge boxSize="1.25em" bg={payed ? "green.500" : "red.500"}>
+                    {data?.requests
+                        ? data.requests.map((e) => (
+                              <Card
+                                  key={e.id}
+                                  background="#eee"
+                                  shadow="none"
+                                  border="1px solid transparent"
+                                  _hover={{ /*transform: "translate(0, -5px)",*/ background: "white", border: "1px solid #eee" }}
+                                  style={{ transition: "100ms" }}
+                                  cursor="pointer"
+                                  onClick={() => router.push(`/request/${e.id}`)}>
+                                  <CardHeader>
+                                      <Flex alignItems="center">
+                                          <Box>
+                                              <Heading size="md">{e.name}</Heading>
+                                              <Text>{getUserDisplayName(e.paidBy)} paid</Text>
+                                          </Box>
+                                          <Spacer />
+                                          <Text fontSize="x-large">€{e.amount.toFixed(2)}</Text>
+                                      </Flex>
+                                      {!e.published && (
+                                          <Badge variant="solid" colorScheme="red">
+                                              Not published yet
+                                          </Badge>
+                                      )}
+                                  </CardHeader>
+                                  <CardBody pt={0}>
+                                      <Flex alignItems="center" gap={4}>
+                                          <Tooltip openDelay={200} label={e.usersToPay.map((e) => getUserDisplayName(e.user)).join(", ")}>
+                                              <AvatarGroup size="md" max={5}>
+                                                  {e.usersToPay.map((u) => {
+                                                      return (
+                                                          <Avatar
+                                                              key={u.user.id}
+                                                              name={u.user.userName || u.user.email}
+                                                              src={u.user.avatarUrl || undefined}>
+                                                              {/* <AvatarBadge boxSize="1.25em" bg={payed ? "green.500" : "red.500"}>
                                                         <FontAwesomeIcon color="white" size="2xs" icon={payed ? faCheck : faTimes} />
                                                     </AvatarBadge> */}
-                                                        </Avatar>
-                                                    );
-                                                })}
-                                            </AvatarGroup>
-                                        </Tooltip>
-                                        <Text>
-                                            <FontAwesomeIcon size="xl" icon={faArrowRight} />
-                                        </Text>
-                                        <Tooltip openDelay={200} label={getUserDisplayName(e.paidBy)}>
-                                            <Avatar name={e.paidBy.userName || e.paidBy.email} src={e.paidBy.avatarUrl || undefined}></Avatar>
-                                        </Tooltip>
-                                    </Flex>
-                                </CardBody>
-                                {/* <CardFooter>
+                                                          </Avatar>
+                                                      );
+                                                  })}
+                                              </AvatarGroup>
+                                          </Tooltip>
+                                          <Text>
+                                              <FontAwesomeIcon size="xl" icon={faArrowRight} />
+                                          </Text>
+                                          <Tooltip openDelay={200} label={getUserDisplayName(e.paidBy)}>
+                                              <Avatar name={e.paidBy.userName || e.paidBy.email} src={e.paidBy.avatarUrl || undefined}></Avatar>
+                                          </Tooltip>
+                                      </Flex>
+                                  </CardBody>
+                                  {/* <CardFooter>
                                     <Button colorScheme="blue">Edit</Button>
                                 </CardFooter> */}
-                            </Card>
-                        ))}
+                              </Card>
+                          ))
+                        : new Array(3).fill(0).map((_, i) => <Skeleton key={i} h="158px"></Skeleton>)}
 
-                        <Button leftIcon={<FontAwesomeIcon icon={faUserCog} />} variant="ghost" colorScheme="blue" onClick={userSettingsOnOpen}>
-                            Settings
-                        </Button>
-                    </Flex>
-                </Skeleton>
+                    <Button mb={8} leftIcon={<FontAwesomeIcon icon={faUserCog} />} variant="ghost" colorScheme="blue" onClick={userSettingsOnOpen}>
+                        Settings
+                    </Button>
+                </Flex>
             </Flex>
 
             <UserSettingsModal isOpen={userSettingsIsOpen} onClose={userSettingsOnClose} />
