@@ -233,8 +233,8 @@ export default function HomePage() {
                                                               name={u.user.userName || u.user.email}
                                                               src={u.user.avatarUrl || undefined}>
                                                               {/* <AvatarBadge boxSize="1.25em" bg={payed ? "green.500" : "red.500"}>
-                                                        <FontAwesomeIcon color="white" size="2xs" icon={payed ? faCheck : faTimes} />
-                                                    </AvatarBadge> */}
+                                                                    <FontAwesomeIcon color="white" size="2xs" icon={payed ? faCheck : faTimes} />
+                                                                </AvatarBadge> */}
                                                           </Avatar>
                                                       );
                                                   })}

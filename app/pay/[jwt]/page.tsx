@@ -121,28 +121,6 @@ export default function Home({ params }: { params: { jwt: string } }) {
                         You still owe {link?.balance.moneyReceiver && getUserDisplayName(link.balance.moneyReceiver)} €{amount?.toFixed(2)}!
                     </Heading>
                 )}
-
-                {/* {link?.paymentMethod === "mollie" ? (
-                    <></>
-                ) : (
-                    <>
-                        {paid ? (
-                            <Heading color="yellow.500" textAlign="center">
-                                You could still be owing €{link?.amount?.toFixed(2)} to{" "}
-                                {link?.balance.moneyReceiver && getUserDisplayName(link.balance.moneyReceiver)}!
-                            </Heading>
-                        ) : !shouldPayMoney ? (
-                            <Heading as="h2" color="yellow.500" textAlign="center">
-                                {link?.balance.moneyHolder && getUserDisplayName(link.balance.moneyHolder)} still ows you €
-                                {link?.balance.amount?.toFixed(2)}!
-                            </Heading>
-                        ) : (
-                            <Heading as="h2" textAlign="center">
-                                You still owe {link?.balance.moneyReceiver && getUserDisplayName(link.balance.moneyReceiver)} €{amount?.toFixed(2)}!
-                            </Heading>
-                        )}
-                    </>
-                )} */}
             </Skeleton>
 
             <Skeleton isLoaded={!!link} textAlign="center">

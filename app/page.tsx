@@ -1,7 +1,7 @@
 "use client";
 
-import { AppText } from "@/components/AppHeader";
-import { Button, Text, Center, Heading, Skeleton } from "@chakra-ui/react";
+import { AppFooter, AppText } from "@/components/AppHeader";
+import { Button, Text, Center, Heading, Skeleton, Spacer } from "@chakra-ui/react";
 import { faArrowRight } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { signIn, signOut, useSession } from "next-auth/react";
@@ -20,6 +20,7 @@ export default function Home() {
 
     return (
         <Center style={{ height: "100%", flexDirection: "column", gap: "1em" }}>
+            <Spacer />
             <AppText />
 
             <Skeleton isLoaded={status === "unauthenticated"}>
@@ -38,6 +39,10 @@ export default function Home() {
                     You&apos;ll need to log in using Google to create a payment request.
                 </Text>
             </Skeleton>
+
+            <Spacer />
+
+            <AppFooter />
         </Center>
     );
 }
